@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { PerformanceData } from '../App';
 
-const API_KEY = 'AIzaSyBEy1LWdeVRqN9NgI7KqlDSgU84kRQVrno';
+const API_KEY = process.env.GEMINI_API
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 export interface PlayerDetection {
