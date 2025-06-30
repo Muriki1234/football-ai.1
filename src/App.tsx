@@ -9,9 +9,10 @@ import PlayerSelection from './components/PlayerSelection';
 import Dashboard from './components/Dashboard';
 import Features from './components/Features';
 import PlayerDatabase from './components/PlayerDatabase';
+import DemoModal from './components/DemoModal';
 
 export interface PlayerRecord {
-  id?: string; // Make id optional since database will generate it
+  id?: string;
   name: string;
   totalMatches: number;
   firstAnalyzed: string;
@@ -52,44 +53,43 @@ function App() {
   const [detectedPlayers, setDetectedPlayers] = useState<any[]>([]);
   const [uploadingForPlayer, setUploadingForPlayer] = useState<PlayerRecord | null>(null);
   const [dbError, setDbError] = useState<string>('');
-  const [viewingPlayerHistory, setViewingPlayerHistory] = useState<boolean>(false); // 新增：标记是否在查看历史数据
+  const [viewingPlayerHistory, setViewingPlayerHistory] = useState<boolean>(false);
+  const [showDemoModal, setShowDemoModal] = useState(false);
+  const [demoVideoUrl, setDemoVideoUrl] = useState('https://www.youtube.com/watch?v=dQw4w9WgXcQ'); // Default demo URL
 
-  // 检查用户认证状态
+  // Check user authentication status
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        console.log('🔍 检查用户认证状态...');
+        console.log('🔍 Checking user authentication status...');
         
-        // 先进行快速健康检查
         const isHealthy = await databaseService.quickHealthCheck();
         if (!isHealthy) {
-          console.warn('⚠️ 数据库健康检查失败，但继续加载应用');
-          setDbError('数据库连接不稳定，部分功能可能受影响');
+          console.warn('⚠️ Database health check failed, but continuing to load app');
+          setDbError('Database connection unstable, some features may be affected');
         }
         
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('❌ 认证检查失败:', error);
-          setDbError(`认证检查失败: ${error.message}`);
+          console.error('❌ Authentication check failed:', error);
+          setDbError(`Authentication check failed: ${error.message}`);
         } else {
           setUser(session?.user || null);
           
           if (session?.user) {
-            console.log('✅ 用户已登录:', session.user.email);
-            // 异步加载球员数据，不阻塞UI
+            console.log('✅ User logged in:', session.user.email);
             loadUserPlayers(session.user.id).catch(err => {
-              console.error('❌ 异步加载球员数据失败:', err);
+              console.error('❌ Async player data loading failed:', err);
             });
           } else {
-            console.log('ℹ️ 用户未登录');
+            console.log('ℹ️ User not logged in');
           }
         }
       } catch (error) {
-        console.error('❌ 认证检查异常:', error);
-        setDbError(`认证检查异常: ${error instanceof Error ? error.message : '未知错误'}`);
+        console.error('❌ Authentication check exception:', error);
+        setDbError(`Authentication check exception: ${error instanceof Error ? error.message : 'Unknown error'}`);
       } finally {
-        // 确保加载状态总是会结束
         setTimeout(() => {
           setLoading(false);
         }, 100);
@@ -98,16 +98,14 @@ function App() {
 
     checkAuth();
 
-    // 监听认证状态变化
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔄 认证状态变化:', event, session?.user?.email);
+      console.log('🔄 Authentication state change:', event, session?.user?.email);
       
       setUser(session?.user || null);
       
       if (session?.user) {
-        // 异步加载球员数据
         loadUserPlayers(session.user.id).catch(err => {
-          console.error('❌ 认证状态变化时加载球员数据失败:', err);
+          console.error('❌ Failed to load player data on auth state change:', err);
         });
       } else {
         setPlayerDatabase([]);
@@ -117,42 +115,36 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 加载用户的球员数据
   const loadUserPlayers = async (userId: string) => {
     try {
-      console.log('📊 加载用户球员数据...');
-      setDbError(''); // 清除之前的错误
+      console.log('📊 Loading user player data...');
+      setDbError('');
       
-      // 使用超时控制，避免无限等待
       const timeoutPromise = new Promise<PlayerRecord[]>((_, reject) => {
-        setTimeout(() => reject(new Error('加载球员数据超时')), 15000); // 15秒超时
+        setTimeout(() => reject(new Error('Player data loading timeout')), 15000);
       });
 
       const loadPromise = databaseService.getUserPlayers(userId);
       
       const players = await Promise.race([loadPromise, timeoutPromise]);
       
-      console.log('✅ 成功加载球员数据:', players.length, '名球员');
+      console.log('✅ Successfully loaded player data:', players.length, 'players');
       setPlayerDatabase(players);
     } catch (error) {
-      console.error('❌ 加载球员数据失败:', error);
-      setDbError(`加载球员数据失败: ${error instanceof Error ? error.message : '未知错误'}`);
-      // 不要阻止应用继续运行，设置空数组
+      console.error('❌ Failed to load player data:', error);
+      setDbError(`Failed to load player data: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setPlayerDatabase([]);
     }
   };
 
-  // 处理认证成功
   const handleAuthSuccess = () => {
-    console.log('✅ 认证成功');
-    setDbError(''); // 清除错误信息
-    // 认证成功后会自动触发 onAuthStateChange
+    console.log('✅ Authentication successful');
+    setDbError('');
   };
 
-  // 处理登出
   const handleSignOut = async () => {
     try {
-      console.log('👋 用户登出...');
+      console.log('👋 User signing out...');
       await supabase.auth.signOut();
       setActiveView('home');
       setPlayerDatabase([]);
@@ -164,7 +156,7 @@ function App() {
       setDbError('');
       setViewingPlayerHistory(false);
     } catch (error) {
-      console.error('❌ 登出失败:', error);
+      console.error('❌ Sign out failed:', error);
     }
   };
 
@@ -174,13 +166,10 @@ function App() {
   };
 
   const handlePlayerSelection = (playerId: number, playerName: string, playerAvatar?: string, players?: any[]) => {
-    // 检查是否是为现有球员上传更多视频
     if (uploadingForPlayer) {
-      // 为现有球员上传视频，直接使用现有球员信息
       setSelectedPlayer({ id: playerId, name: uploadingForPlayer.name });
       setExistingPlayer(uploadingForPlayer);
     } else {
-      // 新的球员选择流程
       const existing = playerDatabase.find(p => 
         p.name.toLowerCase() === playerName.toLowerCase()
       );
@@ -194,7 +183,6 @@ function App() {
       setSelectedPlayer({ id: playerId, name: playerName });
     }
     
-    // 存储检测到的球员以避免重新分析
     if (players) {
       setDetectedPlayers(players);
     }
@@ -204,30 +192,26 @@ function App() {
 
   const handleAnalysisComplete = async (performanceData: PerformanceData, playerName: string, playerAvatar?: string) => {
     if (!user) {
-      console.error('❌ 用户未登录，无法保存数据');
+      console.error('❌ User not logged in, cannot save data');
       return;
     }
 
     const now = new Date().toISOString();
     
     try {
-      console.log('💾 开始保存分析结果...');
-      setDbError(''); // 清除之前的错误
+      console.log('💾 Starting to save analysis results...');
+      setDbError('');
       
       const existingIndex = playerDatabase.findIndex(p => 
         p.name.toLowerCase() === playerName.toLowerCase()
       );
       
       if (existingIndex >= 0) {
-        // 更新现有球员
-        console.log('🔄 更新现有球员:', playerName);
+        console.log('🔄 Updating existing player:', playerName);
         const existing = playerDatabase[existingIndex];
         const updatedHistory = [...existing.performanceHistory, performanceData];
         
-        // 计算新的平均表现
         const avgPerformance = calculateAveragePerformance(updatedHistory);
-        
-        // 检测进步和需要改进的地方
         const improvements = detectImprovements(existing.performanceHistory, performanceData);
         const weaknesses = detectWeaknesses(performanceData);
         
@@ -242,31 +226,26 @@ function App() {
           weaknesses
         };
         
-        // 保存到数据库（异步，不阻塞UI）
         Promise.all([
           databaseService.savePlayerRecord(user.id, updatedPlayer),
           databaseService.savePerformanceRecord(existing.id!, performanceData)
         ]).then(([savedPlayer]) => {
-          console.log('✅ 现有球员更新成功');
-          // 更新本地状态
+          console.log('✅ Existing player update successful');
           const newDatabase = [...playerDatabase];
           newDatabase[existingIndex] = savedPlayer;
           setPlayerDatabase(newDatabase);
         }).catch(error => {
-          console.error('❌ 保存现有球员失败:', error);
-          setDbError(`保存数据失败: ${error.message}`);
+          console.error('❌ Failed to save existing player:', error);
+          setDbError(`Failed to save data: ${error.message}`);
         });
         
-        // 立即更新UI，不等待数据库操作
         const newDatabase = [...playerDatabase];
         newDatabase[existingIndex] = updatedPlayer;
         setPlayerDatabase(newDatabase);
         
       } else {
-        // 创建新球员记录
-        console.log('➕ 创建新球员:', playerName);
+        console.log('➕ Creating new player:', playerName);
         const newPlayer: PlayerRecord = {
-          // Don't set id - let database generate it
           name: playerName,
           totalMatches: 1,
           firstAnalyzed: now,
@@ -278,85 +257,72 @@ function App() {
           weaknesses: detectWeaknesses(performanceData)
         };
         
-        // 立即更新UI with temporary player
         const tempPlayer = { ...newPlayer, id: `temp_${Date.now()}` };
         setPlayerDatabase(prev => [...prev, tempPlayer]);
         
-        // Save to database sequentially to get proper UUID
         try {
-          // First save the player record to get the database-generated UUID
           const savedPlayer = await databaseService.savePlayerRecord(user.id, newPlayer);
-          console.log('✅ 新球员创建成功，ID:', savedPlayer.id);
+          console.log('✅ New player created successfully, ID:', savedPlayer.id);
           
-          // Then save the performance record with the actual player ID
           await databaseService.savePerformanceRecord(savedPlayer.id!, performanceData);
-          console.log('✅ 表现记录保存成功');
+          console.log('✅ Performance record saved successfully');
           
-          // Update local state with the actual saved player
           setPlayerDatabase(prev => 
             prev.map(p => p.id === tempPlayer.id ? savedPlayer : p)
           );
         } catch (error) {
-          console.error('❌ 保存新球员失败:', error);
-          setDbError(`保存数据失败: ${error instanceof Error ? error.message : '未知错误'}`);
-          // Remove the temporary player from UI on error
+          console.error('❌ Failed to save new player:', error);
+          setDbError(`Failed to save data: ${error instanceof Error ? error.message : 'Unknown error'}`);
           setPlayerDatabase(prev => prev.filter(p => p.id !== tempPlayer.id));
         }
       }
       
-      // 清理上传状态
       setUploadingForPlayer(null);
       
     } catch (error) {
-      console.error('❌ 保存球员数据失败:', error);
-      setDbError(`保存数据失败: ${error instanceof Error ? error.message : '未知错误'}`);
-      // 显示错误但不阻止应用继续运行
+      console.error('❌ Failed to save player data:', error);
+      setDbError(`Failed to save data: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
-  // 处理为现有球员上传更多视频
   const handleUploadMoreVideos = (player: PlayerRecord) => {
     setUploadingForPlayer(player);
-    setViewingPlayerHistory(false); // 重置历史查看状态
+    setViewingPlayerHistory(false);
     setActiveView('upload');
   };
 
-  // 处理删除球员
   const handleDeletePlayer = async (playerId: string) => {
     if (!user) return;
 
     try {
-      console.log('🗑️ 删除球员:', playerId);
-      setDbError(''); // 清除之前的错误
+      console.log('🗑️ Deleting player:', playerId);
+      setDbError('');
       
-      // 立即更新UI
       setPlayerDatabase(prev => prev.filter(p => p.id !== playerId));
       
-      // 异步删除数据库记录
       databaseService.deletePlayer(playerId).then(() => {
-        console.log('✅ 球员删除成功');
+        console.log('✅ Player deleted successfully');
       }).catch(error => {
-        console.error('❌ 删除球员失败:', error);
-        setDbError(`删除球员失败: ${error.message}`);
-        // 如果删除失败，恢复数据
+        console.error('❌ Failed to delete player:', error);
+        setDbError(`Failed to delete player: ${error.message}`);
         loadUserPlayers(user.id);
       });
       
     } catch (error) {
-      console.error('❌ 删除球员失败:', error);
-      setDbError(`删除球员失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      console.error('❌ Failed to delete player:', error);
+      setDbError(`Failed to delete player: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
-  // 新增：处理返回球员选择页面
   const handleReturnToPlayerSelection = () => {
-    // 保持当前的视频和检测到的球员数据
     setActiveView('player-selection');
-    // 重置选择状态，但保留检测数据
     setSelectedPlayer(null);
     setExistingPlayer(null);
     setViewingPlayerHistory(false);
-    // 不清除 uploadedVideo 和 detectedPlayers，这样用户可以继续选择其他球员
+  };
+
+  const handleWatchDemo = () => {
+    setShowDemoModal(true);
   };
 
   const calculateAveragePerformance = (history: PerformanceData[]): PerformanceData => {
@@ -382,7 +348,7 @@ function App() {
 
     return {
       matchId: 'average',
-      date: new Date().toISOString(), // Always use valid timestamp
+      date: new Date().toISOString(),
       overall: Math.round(sums.overall / total),
       speed: Math.round(sums.speed / total),
       passing: Math.round(sums.passing / total),
@@ -404,12 +370,12 @@ function App() {
     const previous = history[history.length - 2];
     const improvements: string[] = [];
     
-    if (latest.overall > previous.overall + 2) improvements.push('整体表现显著提升');
-    if (latest.speed > previous.speed + 3) improvements.push('速度有明显进步');
-    if (latest.passing > previous.passing + 3) improvements.push('传球技术改善');
-    if (latest.positioning > previous.positioning + 3) improvements.push('位置感更好');
-    if (latest.passAccuracy > previous.passAccuracy + 5) improvements.push('传球准确率提高');
-    if (latest.topSpeed > previous.topSpeed + 1) improvements.push('最高速度突破');
+    if (latest.overall > previous.overall + 2) improvements.push('Overall performance significantly improved');
+    if (latest.speed > previous.speed + 3) improvements.push('Speed showed notable progress');
+    if (latest.passing > previous.passing + 3) improvements.push('Passing technique improved');
+    if (latest.positioning > previous.positioning + 3) improvements.push('Positioning sense enhanced');
+    if (latest.passAccuracy > previous.passAccuracy + 5) improvements.push('Pass accuracy increased');
+    if (latest.topSpeed > previous.topSpeed + 1) improvements.push('Top speed breakthrough');
     
     return improvements;
   };
@@ -417,22 +383,21 @@ function App() {
   const detectWeaknesses = (performance: PerformanceData): string[] => {
     const weaknesses: string[] = [];
     
-    if (performance.passing < 75) weaknesses.push('传球准确性需要加强');
-    if (performance.speed < 80) weaknesses.push('速度训练可以增加');
-    if (performance.positioning < 80) weaknesses.push('位置感有待提高');
-    if (performance.passAccuracy < 85) weaknesses.push('传球成功率偏低');
-    if (performance.dominantFoot.left < 30) weaknesses.push('弱脚使用频率较低');
+    if (performance.passing < 75) weaknesses.push('Passing accuracy needs strengthening');
+    if (performance.speed < 80) weaknesses.push('Speed training can be increased');
+    if (performance.positioning < 80) weaknesses.push('Positioning sense needs improvement');
+    if (performance.passAccuracy < 85) weaknesses.push('Pass success rate is low');
+    if (performance.dominantFoot.left < 30) weaknesses.push('Weak foot usage frequency is low');
     
     return weaknesses;
   };
 
-  // 显示加载状态
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-green-50 flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">正在加载...</p>
+          <p className="text-gray-600">Loading...</p>
           {dbError && (
             <p className="text-red-600 text-sm mt-2">
               {dbError}
@@ -443,30 +408,28 @@ function App() {
     );
   }
 
-  // 如果有数据库错误，显示错误信息但不阻止应用运行
   if (dbError && !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-green-50 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-6">
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            <strong className="font-bold">数据库连接问题：</strong>
+            <strong className="font-bold">Database Connection Issue:</strong>
             <span className="block sm:inline">{dbError}</span>
           </div>
           <p className="text-gray-600 mb-4">
-            应用仍可正常使用，但数据可能无法保存。请检查网络连接或稍后重试。
+            App can still be used normally, but data may not be saved. Please check network connection or try again later.
           </p>
           <button
             onClick={() => window.location.reload()}
             className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition-colors"
           >
-            重新加载
+            Reload
           </button>
         </div>
       </div>
     );
   }
 
-  // 如果用户未登录，显示认证页面
   if (!user) {
     return <Auth onAuthSuccess={handleAuthSuccess} />;
   }
@@ -480,7 +443,6 @@ function App() {
         onSignOut={handleSignOut}
       />
       
-      {/* 显示数据库错误（如果有）但不阻止应用运行 */}
       {dbError && (
         <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4">
           <div className="flex">
@@ -491,7 +453,7 @@ function App() {
             </div>
             <div className="ml-3">
               <p className="text-sm">
-                数据库连接问题：{dbError}。应用仍可使用，但数据可能无法保存。
+                Database connection issue: {dbError}. App can still be used, but data may not be saved.
               </p>
             </div>
             <div className="ml-auto pl-3">
@@ -511,7 +473,7 @@ function App() {
       <main className="relative">
         {activeView === 'home' && (
           <>
-            <Hero onGetStarted={() => setActiveView('upload')} />
+            <Hero onGetStarted={() => setActiveView('upload')} onWatchDemo={handleWatchDemo} />
             <Features />
           </>
         )}
@@ -541,8 +503,8 @@ function App() {
             existingPlayer={existingPlayer}
             onAnalysisComplete={handleAnalysisComplete}
             detectedPlayers={detectedPlayers}
-            viewingHistoryOnly={viewingPlayerHistory} // 新增：传递历史查看状态
-            onReturnToPlayerSelection={uploadedVideo ? handleReturnToPlayerSelection : undefined} // 新增：只有在有视频时才显示返回按钮
+            viewingHistoryOnly={viewingPlayerHistory}
+            onReturnToPlayerSelection={uploadedVideo ? handleReturnToPlayerSelection : undefined}
           />
         )}
         
@@ -552,9 +514,9 @@ function App() {
             onPlayerSelect={(player) => {
               setExistingPlayer(player);
               setSelectedPlayer({ id: 0, name: player.name });
-              setViewingPlayerHistory(true); // 新增：设置为查看历史状态
-              setUploadedVideo(null); // 清除视频，因为只是查看历史
-              setDetectedPlayers([]); // 清除检测到的球员数据
+              setViewingPlayerHistory(true);
+              setUploadedVideo(null);
+              setDetectedPlayers([]);
               setActiveView('dashboard');
             }}
             onUploadMoreVideos={handleUploadMoreVideos}
@@ -562,6 +524,13 @@ function App() {
           />
         )}
       </main>
+
+      {/* Demo Modal */}
+      <DemoModal 
+        isOpen={showDemoModal}
+        onClose={() => setShowDemoModal(false)}
+        videoUrl={demoVideoUrl}
+      />
     </div>
   );
 }

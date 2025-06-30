@@ -36,13 +36,13 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ onUploadComplete, uploadingFo
     
     if (videoFile) {
       if (videoFile.size > MAX_FILE_SIZE) {
-        setErrorMessage(`视频文件过大 (${formatFileSize(videoFile.size)})，Google Files API 最大支持 2GB`);
+        setErrorMessage(`Video file too large (${formatFileSize(videoFile.size)}), maximum supported is 2GB`);
         return;
       }
       setSelectedFile(videoFile);
       setErrorMessage('');
     } else {
-      setErrorMessage('请选择有效的视频文件');
+      setErrorMessage('Please select a valid video file');
     }
   }, [MAX_FILE_SIZE]);
 
@@ -50,13 +50,13 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ onUploadComplete, uploadingFo
     const file = e.target.files?.[0];
     if (file && file.type.startsWith('video/')) {
       if (file.size > MAX_FILE_SIZE) {
-        setErrorMessage(`视频文件过大 (${formatFileSize(file.size)})，Google Files API 最大支持 2GB`);
+        setErrorMessage(`Video file too large (${formatFileSize(file.size)}), maximum supported is 2GB`);
         return;
       }
       setSelectedFile(file);
       setErrorMessage('');
     } else {
-      setErrorMessage('请选择有效的视频文件');
+      setErrorMessage('Please select a valid video file');
     }
   };
 
@@ -70,7 +70,6 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ onUploadComplete, uploadingFo
   const handleUpload = async () => {
     if (!selectedFile) return;
     
-    // Reset any previous state
     resetUploadState();
     
     setIsUploading(true);
@@ -78,42 +77,71 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ onUploadComplete, uploadingFo
     setUploadStatus('uploading');
     
     try {
-      // 模拟上传进度，所有文件都使用 Files API 处理
-      const uploadInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          const targetProgress = 60; // Files API 处理需要更多时间
-          if (prev >= targetProgress) {
-            clearInterval(uploadInterval);
-            setUploadStatus('analyzing');
-            
-            // 模拟AI分析时间，Files API 处理需要更长时间
-            const analysisTime = 8000; // 8秒分析时间
-            setTimeout(() => {
-              setUploadStatus('complete');
-              setUploadProgress(100);
-              setTimeout(() => {
-                setIsUploading(false);
-                onUploadComplete(selectedFile);
-              }, 1000);
-            }, analysisTime);
-            
-            return targetProgress;
-          }
-          return prev + Math.random() * 8; // 较慢的上传进度
-        });
-      }, 500);
+      // Enhanced progress simulation with multiple stages
+      const progressStages = [
+        { target: 20, duration: 1000, message: 'Preparing video for upload...' },
+        { target: 40, duration: 2000, message: 'Uploading to Gemini servers...' },
+        { target: 60, duration: 2000, message: 'Processing video format...' },
+        { target: 80, duration: 1500, message: 'Initializing AI analysis...' },
+        { target: 95, duration: 1000, message: 'Finalizing upload...' }
+      ];
+
+      for (const stage of progressStages) {
+        setAnalysisStatus(stage.message);
+        await animateProgress(stage.target, stage.duration);
+      }
+
+      setUploadStatus('analyzing');
+      setAnalysisStatus('Gemini AI is analyzing video content and detecting players...');
+      
+      // Final analysis phase
+      const analysisTime = 8000;
+      await new Promise(resolve => setTimeout(resolve, analysisTime));
+      
+      setUploadStatus('complete');
+      setUploadProgress(100);
+      setAnalysisStatus('Gemini analysis complete! Player detection successful');
+      
+      setTimeout(() => {
+        setIsUploading(false);
+        onUploadComplete(selectedFile);
+      }, 1000);
 
     } catch (error) {
-      console.error('上传失败:', error);
+      console.error('Upload failed:', error);
       setUploadStatus('error');
-      setErrorMessage('上传失败，请重试');
+      setErrorMessage('Upload failed, please try again');
       setIsUploading(false);
     }
   };
 
+  const animateProgress = (target: number, duration: number): Promise<void> => {
+    return new Promise(resolve => {
+      const startProgress = uploadProgress;
+      const startTime = Date.now();
+      
+      const animate = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const currentProgress = startProgress + (target - startProgress) * progress;
+        
+        setUploadProgress(currentProgress);
+        
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          resolve();
+        }
+      };
+      
+      animate();
+    });
+  };
+
+  const [analysisStatus, setAnalysisStatus] = useState<string>('');
+
   const handleRetry = () => {
     resetUploadState();
-    // Keep the selected file for retry
   };
 
   const formatFileSize = (bytes: number) => {
@@ -127,15 +155,17 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ onUploadComplete, uploadingFo
   const getStatusMessage = () => {
     if (!selectedFile) return '';
     
+    if (analysisStatus) return analysisStatus;
+    
     switch (uploadStatus) {
       case 'uploading':
-        return '正在上传到 Google Files API...';
+        return 'Uploading to Gemini servers...';
       case 'analyzing':
-        return 'Google Files API 正在深度分析视频...';
+        return 'Gemini AI is analyzing video content...';
       case 'complete':
-        return 'Files API 分析完成！球员识别成功';
+        return 'Gemini analysis complete! Player detection successful';
       case 'error':
-        return '处理失败，请重试';
+        return 'Processing failed, please try again';
       default:
         return '';
     }
@@ -162,47 +192,44 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ onUploadComplete, uploadingFo
           {uploadingForPlayer ? (
             <div className="mb-8">
               <div className="flex items-center justify-center space-x-4 mb-4">
-                {uploadingForPlayer.avatar ? (
+                {uploadingForPlayer.avatar && (
                   <img
                     src={uploadingForPlayer.avatar}
                     alt={uploadingForPlayer.name}
                     className="w-16 h-16 rounded-full object-cover border-4 border-green-500 shadow-lg"
                   />
-                ) : (
-                  <div className="bg-gradient-to-r from-green-500 to-blue-500 p-4 rounded-full">
-                    <User className="w-8 h-8 text-white" />
-                  </div>
                 )}
                 <div>
                   <h1 className="text-4xl font-bold text-gray-900">
-                    为 {uploadingForPlayer.name} 上传更多视频
+                    Upload More Videos for {uploadingForPlayer.name}
                   </h1>
                   <p className="text-xl text-gray-600">
-                    已有 {uploadingForPlayer.totalMatches} 场分析记录，继续添加新的比赛视频
+                    Already has {uploadingForPlayer.totalMatches} analysis records, continue adding new match videos
                   </p>
                 </div>
               </div>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-2xl mx-auto">
                 <div className="text-sm text-blue-800 space-y-1">
-                  <p>• 平均评分: {uploadingForPlayer.averagePerformance.overall}</p>
-                  <p>• 上次分析: {new Date(uploadingForPlayer.lastAnalyzed).toLocaleDateString()}</p>
-                  <p>• 新分析将与历史数据进行对比，显示进步趋势</p>
+                  <p>• Average rating: {uploadingForPlayer.averagePerformance.overall}</p>
+                  <p>• Last analyzed: {new Date(uploadingForPlayer.lastAnalyzed).toLocaleDateString()}</p>
+                  <p>• New analysis will compare with historical data to show progress trends</p>
                 </div>
               </div>
             </div>
           ) : (
             <>
               <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                上传您的足球视频
+                Upload Your Football Video
               </h1>
               <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-                上传您的比赛或训练视频，Google Files API 将智能识别所有球员，让您选择要分析的目标球员
+                Upload your match or training video, Gemini will intelligently identify all players, 
+                allowing you to select the target player for analysis
               </p>
             </>
           )}
           <div className="mt-4 inline-flex items-center bg-gradient-to-r from-blue-100 to-purple-100 text-blue-800 px-4 py-2 rounded-full text-sm">
             <Cloud className="w-4 h-4 mr-2" />
-            <span>完全由 Google Files API 驱动</span>
+            <span>Powered by Gemini AI</span>
           </div>
         </div>
 
@@ -229,15 +256,15 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ onUploadComplete, uploadingFo
                 
                 <div>
                   <h3 className="text-2xl font-semibold text-gray-900 mb-2">
-                    将视频拖拽到这里
+                    Drag and drop your video here
                   </h3>
                   <p className="text-gray-600 mb-6">
-                    或点击选择文件，Google Files API 将自动识别所有球员
+                    Or click to select file, Gemini will automatically identify all players
                   </p>
                   
                   <label className="inline-flex items-center bg-gradient-to-r from-green-600 to-blue-600 text-white px-8 py-4 rounded-xl font-semibold cursor-pointer hover:shadow-lg transform hover:-translate-y-1 transition-all duration-200">
                     <FileVideo className="w-5 h-5 mr-2" />
-                    选择视频文件
+                    Select Video File
                     <input
                       type="file"
                       accept="video/*"
@@ -248,18 +275,18 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ onUploadComplete, uploadingFo
                 </div>
                 
                 <div className="text-sm text-gray-500">
-                  <p>支持格式: MP4, AVI, MOV, WMV, MKV</p>
+                  <p>Supported formats: MP4, AVI, MOV, WMV, MKV</p>
                   <div className="mt-2 space-y-1">
                     <div className="flex items-center justify-center space-x-2 text-blue-600">
                       <Cloud className="w-4 h-4" />
-                      <span>Google Files API 处理 (最大支持 2GB)</span>
+                      <span>Google Files API Processing (Maximum 2GB supported)</span>
                     </div>
                     <div className="flex items-center justify-center space-x-2 text-green-600">
                       <Server className="w-4 h-4" />
-                      <span>服务器端处理，无客户端限制</span>
+                      <span>Server-side processing, no client limitations</span>
                     </div>
                   </div>
-                  <p className="text-blue-600 font-medium mt-2">✨ 100% 由 Google Files API 提供稳定分析</p>
+                  <p className="text-blue-600 font-medium mt-2">✨ 100% powered by Gemini for stable analysis</p>
                 </div>
 
                 {errorMessage && (
@@ -287,7 +314,7 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ onUploadComplete, uploadingFo
                       <p className="text-gray-600">{formatFileSize(selectedFile.size)}</p>
                       <div className="flex items-center space-x-2 text-blue-600">
                         <Cloud className="w-4 h-4" />
-                        <span className="text-sm">Google Files API 处理</span>
+                        <span className="text-sm">Gemini processing</span>
                       </div>
                     </div>
                   </div>
@@ -308,16 +335,16 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ onUploadComplete, uploadingFo
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <h5 className="font-medium text-blue-800 mb-2 flex items-center">
                     <span className="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                    Google Files API 分析准备就绪
+                    Gemini Analysis Ready
                   </h5>
                   <ul className="text-sm text-blue-700 space-y-1">
-                    <li>• Google Files API 将智能识别视频中的所有球员</li>
-                    <li>• 自动检测球衣号码和队伍归属</li>
-                    <li>• 识别主队和客队的球衣颜色</li>
-                    <li>• 分析球员位置和运动轨迹</li>
-                    <li>• 为每个球员生成置信度评分</li>
+                    <li>• Gemini will intelligently identify all players in the video</li>
+                    <li>• Automatically detect jersey numbers and team affiliation</li>
+                    <li>• Identify home and away team jersey colors</li>
+                    <li>• Analyze player positions and movement trajectories</li>
+                    <li>• Generate confidence scores for each player</li>
                     {uploadingForPlayer && (
-                      <li>• 与 {uploadingForPlayer.name} 的历史数据进行对比分析</li>
+                      <li>• Compare with {uploadingForPlayer.name}'s historical data</li>
                     )}
                   </ul>
                 </div>
@@ -325,26 +352,26 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ onUploadComplete, uploadingFo
                 <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4">
                   <h5 className="font-medium text-green-800 mb-2 flex items-center">
                     <Cloud className="w-4 h-4 mr-2" />
-                    Google Files API 优势
+                    Gemini Advantages
                   </h5>
                   <ul className="text-sm text-green-700 space-y-1">
-                    <li>• 支持最大 2GB 的大视频文件</li>
-                    <li>• 100% 服务器端处理，无客户端限制</li>
-                    <li>• 更稳定的 AI 分析，减少检测失败</li>
-                    <li>• 智能重试机制，确保球员识别成功</li>
-                    <li>• 更准确的队伍颜色和球员位置识别</li>
-                    <li>• 优化的处理流程，提高成功率</li>
+                    <li>• Supports large video files up to 2GB</li>
+                    <li>• 100% server-side processing, no client limitations</li>
+                    <li>• More stable AI analysis, reduced detection failures</li>
+                    <li>• Intelligent retry mechanism ensures successful player identification</li>
+                    <li>• More accurate team color and player position recognition</li>
+                    <li>• Optimized processing workflow for higher success rates</li>
                   </ul>
                 </div>
 
                 <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                  <h5 className="font-medium text-purple-800 mb-2">上传建议:</h5>
+                  <h5 className="font-medium text-purple-800 mb-2">Upload Tips:</h5>
                   <ul className="text-sm text-purple-700 space-y-1">
-                    <li>• 确保视频中球员清晰可见</li>
-                    <li>• 良好的光线和拍摄角度能提高识别准确度</li>
-                    <li>• 避免过度晃动的镜头</li>
-                    <li>• 选择球员活动较多的精彩片段</li>
-                    <li>• Files API 将自动优化分析效果</li>
+                    <li>• Ensure players are clearly visible in the video</li>
+                    <li>• Good lighting and shooting angles improve recognition accuracy</li>
+                    <li>• Avoid excessively shaky footage</li>
+                    <li>• Select exciting segments with high player activity</li>
+                    <li>• Gemini will automatically optimize analysis results</li>
                   </ul>
                 </div>
 
@@ -354,7 +381,7 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ onUploadComplete, uploadingFo
                     className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-xl font-semibold hover:shadow-lg transform hover:-translate-y-1 transition-all duration-200 flex items-center justify-center"
                   >
                     <span className="w-2 h-2 bg-white rounded-full mr-3 animate-pulse"></span>
-                    {uploadingForPlayer ? `为 ${uploadingForPlayer.name} 开始分析` : '开始 Google Files API 分析'}
+                    {uploadingForPlayer ? `Start Analysis for ${uploadingForPlayer.name}` : 'Start Gemini Analysis'}
                   </button>
                   <button
                     onClick={() => {
@@ -363,7 +390,7 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ onUploadComplete, uploadingFo
                     }}
                     className="px-8 py-4 border-2 border-gray-300 text-gray-700 rounded-xl font-semibold hover:border-red-500 hover:text-red-600 transition-all duration-200"
                   >
-                    取消
+                    Cancel
                   </button>
                 </div>
               </div>
@@ -382,37 +409,41 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ onUploadComplete, uploadingFo
                     {getStatusMessage()}
                   </h3>
                   <p className="text-gray-600">
-                    {uploadStatus === 'uploading' && '正在将视频上传到 Google Cloud 进行 Files API 处理...'}
-                    {uploadStatus === 'analyzing' && 'Google Files API 正在深度分析视频内容，智能重试确保检测成功...'}
-                    {uploadStatus === 'complete' && '所有球员已成功识别，请选择要分析的目标球员'}
-                    {uploadStatus === 'error' && '处理过程中出现问题，请检查网络连接后重试'}
+                    {uploadStatus === 'uploading' && 'Uploading video to Gemini servers for processing...'}
+                    {uploadStatus === 'analyzing' && 'Gemini is performing deep video analysis with intelligent retry for detection success...'}
+                    {uploadStatus === 'complete' && 'All players successfully identified, please select target player for analysis'}
+                    {uploadStatus === 'error' && 'Processing encountered an issue, please check network connection and retry'}
                   </p>
                   {uploadingForPlayer && (
                     <p className="text-blue-600 mt-2">
-                      分析完成后将与 {uploadingForPlayer.name} 的历史数据进行对比
+                      Analysis will compare with {uploadingForPlayer.name}'s historical data upon completion
                     </p>
                   )}
                 </div>
                 
-                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                {/* Enhanced Progress Bar */}
+                <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden shadow-inner">
                   <div
-                    className={`h-full transition-all duration-500 ease-out ${
+                    className={`h-full transition-all duration-300 ease-out relative ${
                       uploadStatus === 'error' 
                         ? 'bg-red-500' 
-                        : 'bg-gradient-to-r from-blue-500 to-purple-500'
+                        : 'bg-gradient-to-r from-blue-500 via-purple-500 to-green-500'
                     }`}
                     style={{ width: `${uploadProgress}%` }}
-                  />
+                  >
+                    {/* Animated shine effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse"></div>
+                  </div>
                 </div>
                 
                 <div className="flex items-center justify-center space-x-4">
                   <p className="text-lg font-semibold text-gray-900">
-                    {Math.round(uploadProgress)}% 完成
+                    {Math.round(uploadProgress)}% Complete
                   </p>
                   {uploadStatus === 'analyzing' && (
                     <div className="flex items-center text-sm text-blue-600">
                       <span className="w-2 h-2 bg-blue-500 rounded-full mr-2 animate-pulse"></span>
-                      Google Files API 深度分析中...
+                      Gemini deep analysis in progress...
                     </div>
                   )}
                 </div>
@@ -422,7 +453,7 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ onUploadComplete, uploadingFo
                     onClick={handleRetry}
                     className="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition-colors"
                   >
-                    重新尝试
+                    Retry
                   </button>
                 )}
               </div>
@@ -436,9 +467,9 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ onUploadComplete, uploadingFo
             <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-3 rounded-lg inline-block mb-4">
               <Cloud className="w-6 h-6 text-white" />
             </div>
-            <h3 className="font-semibold text-gray-900 mb-2">Google Files API</h3>
+            <h3 className="font-semibold text-gray-900 mb-2">Gemini AI</h3>
             <p className="text-gray-600 text-sm">
-              100% 使用 Google Files API 处理，支持 2GB 大文件，无客户端限制
+              100% powered by Gemini, supports 2GB large files, no client limitations
             </p>
           </div>
           
@@ -446,9 +477,9 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ onUploadComplete, uploadingFo
             <div className="bg-gradient-to-r from-green-500 to-teal-500 p-3 rounded-lg inline-block mb-4">
               <CheckCircle className="w-6 h-6 text-white" />
             </div>
-            <h3 className="font-semibold text-gray-900 mb-2">稳定可靠分析</h3>
+            <h3 className="font-semibold text-gray-900 mb-2">Stable & Reliable Analysis</h3>
             <p className="text-gray-600 text-sm">
-              服务器端处理配合智能重试机制，确保每次都能成功检测到球员
+              Server-side processing with intelligent retry mechanism ensures successful player detection every time
             </p>
           </div>
           
@@ -457,12 +488,12 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ onUploadComplete, uploadingFo
               <Server className="w-6 h-6 text-white" />
             </div>
             <h3 className="font-semibold text-gray-900 mb-2">
-              {uploadingForPlayer ? '历史数据对比' : '无限制处理'}
+              {uploadingForPlayer ? 'Historical Data Comparison' : 'Unlimited Processing'}
             </h3>
             <p className="text-gray-600 text-sm">
               {uploadingForPlayer 
-                ? '新分析将与历史数据对比，显示进步趋势和表现变化'
-                : '完全服务器端处理，支持任意大小视频文件，无浏览器限制'
+                ? 'New analysis will compare with historical data, showing progress trends and performance changes'
+                : 'Complete server-side processing supports any size video files, no browser limitations'
               }
             </p>
           </div>

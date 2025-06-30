@@ -3,9 +3,10 @@ import { Play, Zap, Target, TrendingUp } from 'lucide-react';
 
 interface HeroProps {
   onGetStarted: () => void;
+  onWatchDemo: () => void;
 }
 
-const Hero: React.FC<HeroProps> = ({ onGetStarted }) => {
+const Hero: React.FC<HeroProps> = ({ onGetStarted, onWatchDemo }) => {
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-green-50 via-white to-blue-50">
       {/* Background Pattern */}
@@ -50,7 +51,10 @@ const Hero: React.FC<HeroProps> = ({ onGetStarted }) => {
                 </span>
               </button>
               
-              <button className="border-2 border-gray-300 text-gray-700 px-8 py-4 rounded-xl font-semibold text-lg hover:border-green-500 hover:text-green-600 transition-all duration-200">
+              <button 
+                onClick={onWatchDemo}
+                className="border-2 border-gray-300 text-gray-700 px-8 py-4 rounded-xl font-semibold text-lg hover:border-green-500 hover:text-green-600 transition-all duration-200"
+              >
                 Watch Demo
               </button>
             </div>
@@ -58,16 +62,16 @@ const Hero: React.FC<HeroProps> = ({ onGetStarted }) => {
             {/* Stats */}
             <div className="grid grid-cols-3 gap-8 pt-8">
               <div className="text-center">
-                <div className="text-2xl font-bold text-gray-900">10k+</div>
-                <div className="text-sm text-gray-600">Players Analyzed</div>
-              </div>
-              <div className="text-center">
                 <div className="text-2xl font-bold text-gray-900">95%</div>
                 <div className="text-sm text-gray-600">Accuracy Rate</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-gray-900">24/7</div>
                 <div className="text-sm text-gray-600">AI Analysis</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-gray-900">Real-time</div>
+                <div className="text-sm text-gray-600">Processing</div>
               </div>
             </div>
           </div>

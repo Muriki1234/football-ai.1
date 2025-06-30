@@ -13,9 +13,9 @@ const Header: React.FC<HeaderProps> = ({ activeView, onViewChange, user, onSignO
   const [showUserMenu, setShowUserMenu] = React.useState(false);
 
   const navItems = [
-    { id: 'home', label: '首页', icon: CirclePlay },
-    { id: 'upload', label: '上传视频', icon: Upload },
-    { id: 'database', label: '我的球员', icon: Database },
+    { id: 'home', label: 'Home', icon: CirclePlay },
+    { id: 'upload', label: 'Upload Video', icon: Upload },
+    { id: 'database', label: 'My Players', icon: Database },
   ];
 
   return (
@@ -77,7 +77,7 @@ const Header: React.FC<HeaderProps> = ({ activeView, onViewChange, user, onSignO
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2">
                     <div className="px-4 py-2 border-b border-gray-100">
                       <p className="text-sm font-medium text-gray-900">{user.email}</p>
-                      <p className="text-xs text-gray-500">已登录</p>
+                      <p className="text-xs text-gray-500">Logged in</p>
                     </div>
                     <button
                       onClick={() => {
@@ -87,7 +87,7 @@ const Header: React.FC<HeaderProps> = ({ activeView, onViewChange, user, onSignO
                       className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
                     >
                       <Database className="w-4 h-4" />
-                      <span>我的球员</span>
+                      <span>My Players</span>
                     </button>
                     {onSignOut && (
                       <button
@@ -98,7 +98,7 @@ const Header: React.FC<HeaderProps> = ({ activeView, onViewChange, user, onSignO
                         className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
                       >
                         <LogOut className="w-4 h-4" />
-                        <span>退出登录</span>
+                        <span>Sign Out</span>
                       </button>
                     )}
                   </div>
@@ -150,7 +150,7 @@ const Header: React.FC<HeaderProps> = ({ activeView, onViewChange, user, onSignO
                   className="flex items-center space-x-3 px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 transition-all duration-200"
                 >
                   <LogOut className="w-5 h-5" />
-                  <span className="font-medium">退出登录</span>
+                  <span className="font-medium">Sign Out</span>
                 </button>
               )}
             </nav>

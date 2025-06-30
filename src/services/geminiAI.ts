@@ -8,15 +8,14 @@ export interface PlayerDetection {
   id: number;
   x: number;
   y: number;
-  width: number; // 恢复边界框宽度
-  height: number; // 恢复边界框高度
+  width: number;
+  height: number;
   confidence: number;
   jersey?: string;
   team?: 'home' | 'away';
   teamColor?: string;
   timestamp: number;
-  isReferee?: boolean; // 新增：标记是否为裁判
-  // Add movement tracking data
+  isReferee?: boolean;
   movementPattern?: {
     timestamps: number[];
     positions: { x: number; y: number; width: number; height: number }[];
@@ -27,8 +26,8 @@ export interface AIAnalysisResult {
   detectedPlayers: PlayerDetection[];
   selectedPlayerAnalysis: PerformanceData;
   playerAvatar?: string;
-  bestFrameUrl?: string; // 新增：最佳帧的URL
-  bestFrameTimestamp?: number; // 新增：最佳帧的时间戳
+  bestFrameUrl?: string;
+  bestFrameTimestamp?: number;
 }
 
 export class FootballAI {
@@ -39,57 +38,56 @@ export class FootballAI {
 
   private extractJsonFromString(text: string): string {
     try {
-      // Find the first '{' and last '}' to extract JSON
       const firstBrace = text.indexOf('{');
       const lastBrace = text.lastIndexOf('}');
       
       if (firstBrace === -1 || lastBrace === -1 || firstBrace >= lastBrace) {
-        console.error('AI 响应内容:', text);
-        throw new Error('AI 响应中未找到有效的 JSON 格式数据');
+        console.error('AI response content:', text);
+        throw new Error('No valid JSON format data found in AI response');
       }
       
       return text.substring(firstBrace, lastBrace + 1);
     } catch (error) {
       console.error('Failed to extract JSON from response:', text);
-      throw new Error('AI 响应格式无效，无法解析分析结果');
+      throw new Error('Invalid AI response format, unable to parse analysis results');
     }
   }
 
-  // 新增：从视频中提取最佳帧（包含最多球员的帧）
+  // Extract optimal frame from video (frame with most players)
   async extractBestFrameFromVideo(videoFile: File): Promise<{ frameUrl: string; timestamp: number }> {
     try {
-      console.log('🎬 开始提取视频最佳帧...');
+      console.log('🎬 Starting video optimal frame extraction...');
       
       const video = document.createElement('video');
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
 
       if (!ctx) {
-        throw new Error('无法创建画布上下文');
+        throw new Error('Unable to create canvas context');
       }
 
       return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
-          reject(new Error('提取最佳帧超时'));
-        }, 120000); // 增加超时时间到120秒
+          reject(new Error('Optimal frame extraction timeout'));
+        }, 180000); // Increased timeout to 3 minutes
 
         video.onloadedmetadata = async () => {
           try {
-            console.log(`📹 视频信息: 时长 ${video.duration.toFixed(1)}s, 尺寸 ${video.videoWidth}x${video.videoHeight}`);
+            console.log(`📹 Video info: Duration ${video.duration.toFixed(1)}s, Size ${video.videoWidth}x${video.videoHeight}`);
             
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             
-            // 分析多个时间点，找到包含最多球员的帧
+            // Analyze multiple time points to find frame with most players
             const samplePoints = [];
             const duration = video.duration;
-            const numSamples = Math.min(10, Math.floor(duration / 2)); // 每2秒采样一次，最多10个样本
+            const numSamples = Math.min(15, Math.floor(duration / 2)); // Sample every 2 seconds, max 15 samples
             
             for (let i = 1; i <= numSamples; i++) {
               samplePoints.push((duration / (numSamples + 1)) * i);
             }
             
-            console.log(`🔍 将分析 ${samplePoints.length} 个时间点:`, samplePoints.map(t => t.toFixed(1) + 's'));
+            console.log(`🔍 Will analyze ${samplePoints.length} time points:`, samplePoints.map(t => t.toFixed(1) + 's'));
             
             let bestFrame = null;
             let bestTimestamp = 0;
@@ -97,19 +95,19 @@ export class FootballAI {
             
             for (const timestamp of samplePoints) {
               try {
-                // 跳转到指定时间点
+                // Jump to specified time point
                 video.currentTime = timestamp;
                 await new Promise(resolve => {
                   video.onseeked = resolve;
                 });
                 
-                // 绘制当前帧
+                // Draw current frame
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 const frameDataUrl = canvas.toDataURL('image/jpeg', 0.9);
                 
-                // 使用AI分析这一帧包含的球员数量
+                // Use AI to analyze player count in this frame
                 const playerCount = await this.analyzeFrameForPlayerCount(frameDataUrl);
-                console.log(`⏱️ ${timestamp.toFixed(1)}s: 检测到 ${playerCount} 名球员`);
+                console.log(`⏱️ ${timestamp.toFixed(1)}s: Detected ${playerCount} players`);
                 
                 if (playerCount > maxPlayerCount) {
                   maxPlayerCount = playerCount;
@@ -117,33 +115,33 @@ export class FootballAI {
                   bestTimestamp = timestamp;
                 }
                 
-                // 短暂延迟避免过快处理
-                await new Promise(resolve => setTimeout(resolve, 100));
+                // Brief delay to avoid rapid processing
+                await new Promise(resolve => setTimeout(resolve, 200));
                 
               } catch (frameError) {
-                console.warn(`⚠️ 分析时间点 ${timestamp.toFixed(1)}s 失败:`, frameError);
+                console.warn(`⚠️ Analysis failed at time point ${timestamp.toFixed(1)}s:`, frameError);
               }
             }
             
             if (bestFrame) {
-              console.log(`✅ 找到最佳帧: ${bestTimestamp.toFixed(1)}s, 包含 ${maxPlayerCount} 名球员`);
+              console.log(`✅ Found optimal frame: ${bestTimestamp.toFixed(1)}s, contains ${maxPlayerCount} players`);
               clearTimeout(timeout);
               resolve({ frameUrl: bestFrame, timestamp: bestTimestamp });
             } else {
-              // 如果没有找到最佳帧，使用视频中间的帧作为后备
+              // If no optimal frame found, use middle frame as fallback
               const fallbackTimestamp = duration / 2;
               video.currentTime = fallbackTimestamp;
               video.onseeked = () => {
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 const fallbackFrame = canvas.toDataURL('image/jpeg', 0.9);
-                console.log(`📷 使用后备帧: ${fallbackTimestamp.toFixed(1)}s`);
+                console.log(`📷 Using fallback frame: ${fallbackTimestamp.toFixed(1)}s`);
                 clearTimeout(timeout);
                 resolve({ frameUrl: fallbackFrame, timestamp: fallbackTimestamp });
               };
             }
             
           } catch (error) {
-            console.error('❌ 提取最佳帧过程中出错:', error);
+            console.error('❌ Error during optimal frame extraction:', error);
             clearTimeout(timeout);
             reject(error);
           }
@@ -151,39 +149,37 @@ export class FootballAI {
 
         video.onerror = () => {
           clearTimeout(timeout);
-          reject(new Error('视频加载失败，无法提取最佳帧'));
+          reject(new Error('Video loading failed, unable to extract optimal frame'));
         };
 
         video.src = URL.createObjectURL(videoFile);
       });
 
     } catch (error) {
-      console.error('❌ 提取最佳帧失败:', error);
-      throw new Error('提取最佳帧失败，请重试');
+      console.error('❌ Optimal frame extraction failed:', error);
+      throw new Error('Optimal frame extraction failed, please try again');
     }
   }
 
-  // 新增：分析单帧图像中的球员数量
+  // Analyze single frame image for player count
   private async analyzeFrameForPlayerCount(frameDataUrl: string): Promise<number> {
     try {
-      // 将base64图像转换为blob
       const response = await fetch(frameDataUrl);
       const blob = await response.blob();
       
-      // 使用简化的提示词快速计算球员数量
       const prompt = `
-        请快速分析这张足球比赛图片，只需要告诉我图片中大概有多少名球员。
+        Please quickly analyze this football match image and tell me approximately how many players you can see.
         
-        请只返回一个数字，表示你看到的球员数量。如果看不清楚，请估算一个合理的数字。
+        Please return only a number representing the player count you see. If unclear, estimate a reasonable number.
         
-        例如：如果你看到大约5名球员，就返回"5"。
+        For example: If you see about 5 players, return "5".
       `;
 
       const result = await this.model.generateContent([
         prompt,
         {
           inlineData: {
-            data: frameDataUrl.split(',')[1], // 移除data:image/jpeg;base64,前缀
+            data: frameDataUrl.split(',')[1],
             mimeType: 'image/jpeg'
           }
         }
@@ -192,47 +188,44 @@ export class FootballAI {
       const responseText = result.response.text();
       const playerCount = parseInt(responseText.match(/\d+/)?.[0] || '0');
       
-      return Math.max(0, Math.min(22, playerCount)); // 限制在合理范围内
+      return Math.max(0, Math.min(22, playerCount));
       
     } catch (error) {
-      console.warn('分析帧中球员数量失败:', error);
-      return 0; // 返回0作为后备值
+      console.warn('Failed to analyze player count in frame:', error);
+      return 0;
     }
   }
 
-  // 修改：使用最佳帧进行球员检测
+  // Use optimal frame for player detection
   async uploadAndAnalyzeVideo(videoFile: File): Promise<{ players: PlayerDetection[]; bestFrameUrl: string; bestFrameTimestamp: number }> {
     try {
-      console.log('🚀 开始 AI 视频分析（最佳帧模式）...', {
+      console.log('🚀 Starting Gemini video analysis (optimal frame mode)...', {
         fileName: videoFile.name,
         fileSize: this.formatFileSize(videoFile.size),
         fileType: videoFile.type
       });
       
-      // Validate file type
       if (!videoFile.type.startsWith('video/')) {
-        throw new Error('文件格式不支持，请上传有效的视频文件');
+        throw new Error('Unsupported file format, please upload a valid video file');
       }
 
-      // Additional validation for empty files
       if (videoFile.size === 0) {
-        throw new Error('视频文件为空，请选择有效的视频文件');
+        throw new Error('Video file is empty, please select a valid video file');
       }
 
-      // Validate file size for Files API (2GB limit)
       if (videoFile.size > this.MAX_FILE_SIZE) {
-        throw new Error(`视频文件过大 (${this.formatFileSize(videoFile.size)})，Files API 最大支持 2GB`);
+        throw new Error(`Video file too large (${this.formatFileSize(videoFile.size)}), maximum supported by Gemini is 2GB`);
       }
 
-      // 第一步：提取最佳帧
-      console.log('🎯 第一步：提取包含最多球员的最佳帧...');
+      // Step 1: Extract optimal frame
+      console.log('🎯 Step 1: Extract optimal frame with most players...');
       const { frameUrl, timestamp } = await this.extractBestFrameFromVideo(videoFile);
       
-      // 第二步：使用最佳帧进行精确的球员检测
-      console.log('🔍 第二步：使用最佳帧进行精确球员检测...');
+      // Step 2: Use optimal frame for precise player detection
+      console.log('🔍 Step 2: Use optimal frame for precise player detection...');
       const players = await this.analyzeFrameForPlayers(frameUrl, timestamp);
       
-      console.log(`✅ 球员检测完成！在最佳帧中检测到 ${players.length} 名球员`);
+      console.log(`✅ Player detection complete! Detected ${players.length} players in optimal frame`);
       
       return {
         players,
@@ -241,64 +234,63 @@ export class FootballAI {
       };
 
     } catch (error) {
-      console.error('❌ AI 视频分析详细错误:', error);
+      console.error('❌ Gemini video analysis detailed error:', error);
       
-      // Provide specific error messages based on error type
       if (error instanceof Error) {
         if (error.message.includes('API key') || error.message.includes('API_KEY')) {
-          throw new Error('Google AI API 密钥无效或已过期，请检查配置');
+          throw new Error('Google AI API key invalid or expired, please check configuration');
         } else if (error.message.includes('quota') || error.message.includes('QUOTA')) {
-          throw new Error('Google AI API 配额已用完，请稍后重试');
+          throw new Error('Google AI API quota exhausted, please try again later');
         } else if (error.message.includes('network') || error.message.includes('fetch') || error.message.includes('NetworkError')) {
-          throw new Error('网络连接失败，请检查网络连接后重试');
+          throw new Error('Network connection failed, please check network connection and retry');
         } else if (error.message.includes('timeout') || error.message.includes('TIMEOUT') || error.message.includes('超时')) {
-          throw new Error('AI 处理超时，视频可能过长或过于复杂，请尝试较短的视频片段');
+          throw new Error('AI processing timeout, video may be too long or complex, please try shorter video clips');
         } else if (error.message.includes('SAFETY') || error.message.includes('safety')) {
-          throw new Error('视频内容被 AI 安全过滤器拦截，请尝试其他视频');
+          throw new Error('Video content blocked by AI safety filter, please try other videos');
         } else if (error.message.includes('INVALID_ARGUMENT')) {
-          throw new Error('视频格式不被 AI 支持，请尝试 MP4 格式的视频');
+          throw new Error('Video format not supported by AI, please try MP4 format videos');
         } else {
           throw error;
         }
       }
       
-      throw new Error('AI 视频分析失败，请检查视频格式和网络连接');
+      throw new Error('Gemini video analysis failed, please check video format and network connection');
     }
   }
 
-  // 改进：使用最佳帧进行详细的球员检测（带边界框和裁判过滤）
+  // Improved: Use optimal frame for detailed player detection (with boundary boxes and referee filtering)
   private async analyzeFrameForPlayers(frameDataUrl: string, timestamp: number): Promise<PlayerDetection[]> {
     try {
-      console.log('🔍 开始分析最佳帧中的球员（过滤裁判）...');
+      console.log('🔍 Starting optimal frame player analysis (filtering referees)...');
       
       const prompt = `
-        请仔细分析这张足球比赛图片，识别其中的所有球员并过滤掉裁判。
+        Please carefully analyze this football match image and identify all players while filtering out referees.
 
-        重要要求：
-        1. 只识别穿着球队球衣的球员，不要识别裁判
-        2. 裁判通常穿黑色、黄色或其他明显不同于两队球衣的颜色
-        3. 为每个球员提供边界框坐标：
-           - x, y: 边界框左上角的位置（百分比形式，0-100）
-           - width, height: 边界框的宽度和高度（百分比形式，0-100）
-        4. 确保边界框紧密包围球员身体
-        5. 提供检测置信度（0-1之间的数值）
-        6. 如果能看到球衣号码，请记录，否则使用序号
-        7. 根据球衣颜色判断队伍归属（主队或客队）
-        8. 识别每个队伍的主要球衣颜色
-        9. 如果不确定是否为裁判，请标记 isReferee 字段
+        Important requirements:
+        1. Only identify players wearing team jerseys, do not identify referees
+        2. Referees usually wear black, yellow, or other colors clearly different from both team jerseys
+        3. Provide boundary box coordinates for each player:
+           - x, y: Top-left corner position of boundary box (percentage form, 0-100)
+           - width, height: Width and height of boundary box (percentage form, 0-100)
+        4. Ensure boundary boxes tightly surround player bodies
+        5. Provide detection confidence (value between 0-1)
+        6. Record jersey numbers if visible, otherwise use sequence numbers
+        7. Determine team affiliation based on jersey colors (home or away)
+        8. Identify main jersey colors for each team
+        9. If uncertain whether someone is a referee, mark the isReferee field
 
-        边界框说明：
-        - x, y 是边界框左上角相对于图片的百分比位置
-        - width, height 是边界框相对于图片的百分比大小
-        - 边界框应该紧密包围球员，宽度通常在5-15%，高度在10-25%
+        Boundary box explanation:
+        - x, y are percentage positions of boundary box top-left corner relative to image
+        - width, height are percentage sizes of boundary box relative to image
+        - Boundary boxes should tightly surround players, width usually 5-15%, height 10-25%
 
-        重要：请只返回 JSON 格式的数据，不要包含任何其他文字说明。
+        Important: Please return only JSON format data, do not include any other text explanations.
 
-        返回格式：
+        Return format:
         {
           "teamColors": {
-            "home": "蓝色",
-            "away": "红色"
+            "home": "Blue",
+            "away": "Red"
           },
           "players": [
             {
@@ -310,14 +302,14 @@ export class FootballAI {
               "confidence": 0.95,
               "jersey": "10",
               "team": "home",
-              "teamColor": "蓝色",
+              "teamColor": "Blue",
               "timestamp": ${timestamp},
               "isReferee": false
             }
           ]
         }
 
-        请开始分析并返回 JSON 结果。记住：只识别球员，过滤掉裁判！
+        Please start analysis and return JSON results. Remember: Only identify players, filter out referees!
       `;
 
       let analysisResult;
@@ -327,56 +319,55 @@ export class FootballAI {
       while (attempts < maxAttempts) {
         try {
           attempts++;
-          console.log(`🔄 球员检测第 ${attempts} 次尝试...`);
+          console.log(`🔄 Player detection attempt ${attempts}...`);
 
           const result = await this.model.generateContent([
             prompt,
             {
               inlineData: {
-                data: frameDataUrl.split(',')[1], // 移除data:image/jpeg;base64,前缀
+                data: frameDataUrl.split(',')[1],
                 mimeType: 'image/jpeg'
               }
             }
           ]);
 
           const responseText = result.response.text();
-          console.log('AI 原始响应:', responseText.substring(0, 500) + '...');
+          console.log('AI raw response:', responseText.substring(0, 500) + '...');
           
-          // Extract JSON from the response
           const firstBrace = responseText.indexOf('{');
           const lastBrace = responseText.lastIndexOf('}');
           
           if (firstBrace === -1 || lastBrace === -1) {
-            throw new Error('AI 响应中未找到有效的 JSON 格式数据');
+            throw new Error('No valid JSON format data found in AI response');
           }
 
           const jsonString = responseText.substring(firstBrace, lastBrace + 1);
           analysisResult = JSON.parse(jsonString);
 
           if (!analysisResult.players || !Array.isArray(analysisResult.players)) {
-            throw new Error('AI 分析结果格式错误，未找到球员数据数组');
+            throw new Error('AI analysis result format error, player data array not found');
           }
 
-          // 过滤掉裁判
+          // Filter out referees
           const filteredPlayers = analysisResult.players.filter((player: any) => !player.isReferee);
           analysisResult.players = filteredPlayers;
 
-          // 如果检测到球员，就算成功
+          // If players detected, consider success
           if (analysisResult.players.length > 0) {
-            console.log(`✅ 第 ${attempts} 次尝试成功！检测到 ${analysisResult.players.length} 名球员（已过滤裁判）`);
+            console.log(`✅ Attempt ${attempts} successful! Detected ${analysisResult.players.length} players (referees filtered)`);
             break;
           } else {
-            throw new Error('AI 未检测到任何球员（可能都被识别为裁判）');
+            throw new Error('Gemini detected no players (possibly all identified as referees)');
           }
 
         } catch (attemptError) {
-          console.error(`❌ 第 ${attempts} 次尝试失败:`, attemptError);
+          console.error(`❌ Attempt ${attempts} failed:`, attemptError);
           
           if (attempts === maxAttempts) {
-            // 如果所有尝试都失败，返回一个默认的球员配置
-            console.log('所有尝试失败，返回默认球员配置...');
+            // If all attempts fail, return default player configuration
+            console.log('All attempts failed, returning default player configuration...');
             analysisResult = {
-              teamColors: { home: '蓝色', away: '红色' },
+              teamColors: { home: 'Blue', away: 'Red' },
               players: [
                 {
                   id: 1,
@@ -387,7 +378,7 @@ export class FootballAI {
                   confidence: 0.8,
                   jersey: '10',
                   team: 'home',
-                  teamColor: '蓝色',
+                  teamColor: 'Blue',
                   timestamp: timestamp,
                   isReferee: false
                 },
@@ -400,7 +391,7 @@ export class FootballAI {
                   confidence: 0.8,
                   jersey: '7',
                   team: 'away',
-                  teamColor: '红色',
+                  teamColor: 'Red',
                   timestamp: timestamp,
                   isReferee: false
                 },
@@ -413,7 +404,7 @@ export class FootballAI {
                   confidence: 0.7,
                   jersey: '9',
                   team: 'home',
-                  teamColor: '蓝色',
+                  teamColor: 'Blue',
                   timestamp: timestamp,
                   isReferee: false
                 },
@@ -426,7 +417,7 @@ export class FootballAI {
                   confidence: 0.7,
                   jersey: '11',
                   team: 'away',
-                  teamColor: '红色',
+                  teamColor: 'Red',
                   timestamp: timestamp,
                   isReferee: false
                 }
@@ -435,7 +426,7 @@ export class FootballAI {
             break;
           }
           
-          // 等待后重试
+          // Wait before retry
           await new Promise(resolve => setTimeout(resolve, 2000 * attempts));
         }
       }
@@ -450,9 +441,9 @@ export class FootballAI {
         confidence: typeof player.confidence === 'number' ? Math.max(0, Math.min(1, player.confidence)) : 0.8,
         jersey: player.jersey || (index + 1).toString(),
         team: player.team || (index % 2 === 0 ? 'home' : 'away'),
-        teamColor: player.teamColor || (player.team === 'home' ? analysisResult.teamColors?.home : analysisResult.teamColors?.away) || (index % 2 === 0 ? '蓝色' : '红色'),
+        teamColor: player.teamColor || (player.team === 'home' ? analysisResult.teamColors?.home : analysisResult.teamColors?.away) || (index % 2 === 0 ? 'Blue' : 'Red'),
         timestamp: timestamp,
-        isReferee: false, // 确保过滤后的都不是裁判
+        isReferee: false,
         movementPattern: this.generateRealisticMovementPatternWithBounds(
           player.x || 50, 
           player.y || 50, 
@@ -461,16 +452,16 @@ export class FootballAI {
         ),
       }));
 
-      console.log(`🎯 最佳帧分析完成，最终返回 ${processedPlayers.length} 名球员（已过滤裁判）`);
+      console.log(`🎯 Optimal frame analysis complete, final return ${processedPlayers.length} players (referees filtered)`);
       return processedPlayers;
 
     } catch (error) {
-      console.error('❌ 最佳帧球员检测失败:', error);
-      throw new Error(`最佳帧球员检测失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      console.error('❌ Optimal frame player detection failed:', error);
+      throw new Error(`Optimal frame player detection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
-  // 压缩视频文件
+  // Compress video file
   private async compressVideo(videoFile: File, targetSizeMB: number = 200): Promise<File> {
     return new Promise((resolve, reject) => {
       const video = document.createElement('video');
@@ -478,31 +469,28 @@ export class FootballAI {
       const ctx = canvas.getContext('2d');
       
       if (!ctx) {
-        reject(new Error('无法创建画布上下文'));
+        reject(new Error('Unable to create canvas context'));
         return;
       }
 
       video.onloadedmetadata = () => {
         try {
-          // 计算压缩比例
           const originalSizeMB = videoFile.size / (1024 * 1024);
           const compressionRatio = Math.min(1, targetSizeMB / originalSizeMB);
           
-          // 调整视频尺寸和质量
           const newWidth = Math.floor(video.videoWidth * Math.sqrt(compressionRatio));
           const newHeight = Math.floor(video.videoHeight * Math.sqrt(compressionRatio));
           
           canvas.width = newWidth;
           canvas.height = newHeight;
           
-          console.log(`🎬 压缩视频: ${originalSizeMB.toFixed(1)}MB -> 目标 ${targetSizeMB}MB`);
-          console.log(`📐 尺寸调整: ${video.videoWidth}x${video.videoHeight} -> ${newWidth}x${newHeight}`);
+          console.log(`🎬 Compressing video: ${originalSizeMB.toFixed(1)}MB -> target ${targetSizeMB}MB`);
+          console.log(`📐 Size adjustment: ${video.videoWidth}x${video.videoHeight} -> ${newWidth}x${newHeight}`);
           
-          // 创建 MediaRecorder 进行重新编码
           const stream = canvas.captureStream(15); // 15 FPS
           const mediaRecorder = new MediaRecorder(stream, {
             mimeType: 'video/webm;codecs=vp8',
-            videoBitsPerSecond: Math.floor(1000000 * compressionRatio) // 动态比特率
+            videoBitsPerSecond: Math.floor(1000000 * compressionRatio)
           });
           
           const chunks: Blob[] = [];
@@ -519,19 +507,17 @@ export class FootballAI {
               type: 'video/webm'
             });
             
-            console.log(`✅ 视频压缩完成: ${(compressedFile.size / 1024 / 1024).toFixed(1)}MB`);
+            console.log(`✅ Video compression complete: ${(compressedFile.size / 1024 / 1024).toFixed(1)}MB`);
             resolve(compressedFile);
           };
           
           mediaRecorder.onerror = (error) => {
-            console.error('❌ 视频压缩失败:', error);
-            reject(new Error('视频压缩过程中出现错误'));
+            console.error('❌ Video compression failed:', error);
+            reject(new Error('Error occurred during video compression'));
           };
           
-          // 开始录制
           mediaRecorder.start();
           
-          // 播放并绘制到画布
           let frameCount = 0;
           const maxFrames = Math.floor(video.duration * 15); // 15 FPS
           
@@ -544,7 +530,6 @@ export class FootballAI {
             ctx.drawImage(video, 0, 0, newWidth, newHeight);
             frameCount++;
             
-            // 控制帧率
             setTimeout(() => {
               if (video.currentTime < video.duration) {
                 video.currentTime = frameCount / 15;
@@ -561,49 +546,46 @@ export class FootballAI {
           };
           
         } catch (error) {
-          console.error('❌ 视频压缩设置失败:', error);
+          console.error('❌ Video compression setup failed:', error);
           reject(error);
         }
       };
       
       video.onerror = () => {
-        reject(new Error('视频加载失败，无法进行压缩'));
+        reject(new Error('Video loading failed, unable to compress'));
       };
       
       video.src = URL.createObjectURL(videoFile);
     });
   }
 
-  // 检查并处理大文件
+  // Check and process large files
   private async preprocessVideoFile(videoFile: File): Promise<File> {
     const fileSizeMB = videoFile.size / (1024 * 1024);
     
-    console.log(`📁 原始文件大小: ${fileSizeMB.toFixed(1)}MB`);
+    console.log(`📁 Original file size: ${fileSizeMB.toFixed(1)}MB`);
     
-    // 如果文件超过推荐大小，进行压缩
     if (videoFile.size > this.RECOMMENDED_SIZE) {
-      console.log(`⚠️ 文件过大 (${fileSizeMB.toFixed(1)}MB)，开始压缩...`);
+      console.log(`⚠️ File too large (${fileSizeMB.toFixed(1)}MB), starting compression...`);
       
       try {
-        // 根据原始大小动态调整目标大小
-        let targetSize = 150; // 默认150MB
+        let targetSize = 150; // Default 150MB
         if (fileSizeMB > 1000) {
-          targetSize = 100; // 超过1GB的文件压缩到100MB
+          targetSize = 100; // Compress files over 1GB to 100MB
         } else if (fileSizeMB > 500) {
-          targetSize = 120; // 超过500MB的文件压缩到120MB
+          targetSize = 120; // Compress files over 500MB to 120MB
         }
         
         const compressedFile = await this.compressVideo(videoFile, targetSize);
-        console.log(`✅ 文件压缩完成: ${(compressedFile.size / 1024 / 1024).toFixed(1)}MB`);
+        console.log(`✅ File compression complete: ${(compressedFile.size / 1024 / 1024).toFixed(1)}MB`);
         return compressedFile;
       } catch (compressionError) {
-        console.warn('⚠️ 视频压缩失败，尝试使用原文件:', compressionError);
+        console.warn('⚠️ Video compression failed, trying with original file:', compressionError);
         
-        // 如果压缩失败但文件仍在可接受范围内，继续使用原文件
         if (videoFile.size <= this.MAX_FILE_SIZE) {
           return videoFile;
         } else {
-          throw new Error(`文件过大 (${fileSizeMB.toFixed(1)}MB) 且压缩失败，请手动压缩视频后重试`);
+          throw new Error(`File too large (${fileSizeMB.toFixed(1)}MB) and compression failed, please manually compress video and retry`);
         }
       }
     }
@@ -618,71 +600,64 @@ export class FootballAI {
     existingPlayerData?: any
   ): Promise<PerformanceData> {
     try {
-      console.log(`🏃 开始 Files API 球员表现分析 ${playerName}...`, {
+      console.log(`🏃 Starting Gemini player performance analysis for ${playerName}...`, {
         playerId: selectedPlayerId,
         fileName: videoFile.name,
         hasExistingData: !!existingPlayerData
       });
 
-      // Validate inputs
       if (!videoFile || videoFile.size === 0) {
-        throw new Error('视频文件无效或为空');
+        throw new Error('Video file invalid or empty');
       }
 
       if (!playerName || playerName.trim().length === 0) {
-        throw new Error('球员姓名不能为空');
+        throw new Error('Player name cannot be empty');
       }
 
-      // Validate file size for Files API
       if (videoFile.size > this.MAX_FILE_SIZE) {
-        throw new Error(`视频文件过大 (${this.formatFileSize(videoFile.size)})，Files API 最大支持 2GB`);
+        throw new Error(`Video file too large (${this.formatFileSize(videoFile.size)}), maximum supported by Gemini is 2GB`);
       }
 
-      // 预处理视频文件（压缩大文件）
       const processedFile = await this.preprocessVideoFile(videoFile);
 
-      // 检查是否有 Supabase 环境变量
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-      // 🔥 关键修改：强制使用服务器端 Files API 处理
       if (supabaseUrl && supabaseKey) {
-        console.log('✅ 使用服务器端 Files API 处理球员表现分析...');
+        console.log('✅ Using server-side Gemini processing for player performance analysis...');
         return await this.analyzePlayerPerformanceOnServer(processedFile, selectedPlayerId, playerName, existingPlayerData);
       } else {
-        // 🔥 关键修改：没有服务器配置时，直接抛出错误
-        throw new Error('未配置服务器端处理环境。请配置 Supabase 环境变量以使用 Google Files API 处理视频文件。');
+        throw new Error('Server-side processing environment not configured. Please configure Supabase environment variables to use Gemini for video file processing.');
       }
 
     } catch (error) {
-      console.error('❌ Files API 球员表现分析详细错误:', error);
+      console.error('❌ Gemini player performance analysis detailed error:', error);
       
-      // Provide specific error messages
       if (error instanceof Error) {
-        if (error.message.includes('未配置服务器端处理环境')) {
-          throw error; // Re-throw configuration errors as-is
+        if (error.message.includes('Server-side processing environment not configured')) {
+          throw error;
         } else if (error.message.includes('API key')) {
-          throw new Error('Google AI API 密钥无效，无法进行球员表现分析');
+          throw new Error('Google AI API key invalid, unable to perform player performance analysis');
         } else if (error.message.includes('quota')) {
-          throw new Error('Google AI API 配额已用完，无法完成分析');
+          throw new Error('Google AI API quota exhausted, unable to complete analysis');
         } else if (error.message.includes('network') || error.message.includes('fetch')) {
-          throw new Error('网络连接失败，无法连接到服务器');
+          throw new Error('Network connection failed, unable to connect to server');
         } else if (error.message.includes('timeout')) {
-          throw new Error('Files API 分析超时，视频可能过于复杂或网络较慢');
+          throw new Error('Gemini analysis timeout, video may be too complex or network slow');
         } else if (error.message.includes('JSON') || error.message.includes('parse')) {
-          throw new Error('AI 返回的分析结果格式错误，无法解析');
+          throw new Error('AI returned analysis result format error, unable to parse');
         } else if (error.message.includes('SAFETY')) {
-          throw new Error('视频内容被 AI 安全过滤器拦截');
+          throw new Error('Video content blocked by AI safety filter');
         } else {
           throw error;
         }
       }
       
-      throw new Error(`球员 ${playerName} 的表现分析失败，请重试`);
+      throw new Error(`Player ${playerName} performance analysis failed, please try again`);
     }
   }
 
-  // 服务器端球员表现分析，使用 Files API
+  // Server-side player performance analysis using Gemini
   private async analyzePlayerPerformanceOnServer(
     videoFile: File,
     selectedPlayerId: number,
@@ -690,14 +665,13 @@ export class FootballAI {
     existingPlayerData?: any
   ): Promise<PerformanceData> {
     try {
-      console.log('🚀 开始服务器端 Files API 球员表现分析...');
+      console.log('🚀 Starting server-side Gemini player performance analysis...');
       
-      // 检查 Supabase 环境变量
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
       if (!supabaseUrl || !supabaseKey) {
-        throw new Error('Supabase 环境变量未配置');
+        throw new Error('Supabase environment variables not configured');
       }
       
       const formData = new FormData();
@@ -709,22 +683,19 @@ export class FootballAI {
         formData.append('existingPlayerData', JSON.stringify(existingPlayerData));
       }
       
-      // 重试逻辑 - 减少重试次数以避免资源耗尽
       let result;
       let attempts = 0;
-      const maxAttempts = 2; // 减少重试次数
+      const maxAttempts = 2;
       
       while (attempts < maxAttempts) {
         try {
           attempts++;
-          console.log(`🔄 球员表现分析第 ${attempts} 次尝试...`);
+          console.log(`🔄 Player performance analysis attempt ${attempts}...`);
           
-          // 修复 URL 构建问题
           const functionUrl = `${supabaseUrl}/functions/v1/analyze-player-performance`;
-          console.log('📡 请求 URL:', functionUrl);
+          console.log('📡 Request URL:', functionUrl);
           
-          // 增加超时时间以处理大文件
-          const timeoutMs = 600000; // 10分钟超时
+          const timeoutMs = 600000; // 10 minute timeout
           
           const fetchPromise = fetch(functionUrl, {
             method: 'POST',
@@ -737,59 +708,56 @@ export class FootballAI {
           const response = await Promise.race([
             fetchPromise,
             new Promise<never>((_, reject) => 
-              setTimeout(() => reject(new Error('请求超时')), timeoutMs)
+              setTimeout(() => reject(new Error('Request timeout')), timeoutMs)
             )
           ]);
           
           if (!response.ok) {
             const errorText = await response.text();
-            console.error(`❌ 第 ${attempts} 次尝试失败:`, response.status, errorText);
+            console.error(`❌ Attempt ${attempts} failed:`, response.status, errorText);
             
-            // 特殊处理 546 错误（资源限制）
             if (response.status === 546) {
-              throw new Error('服务器资源不足，请尝试压缩视频文件或稍后重试');
+              throw new Error('Server resources insufficient, please try compressing video file or retry later');
             }
             
-            throw new Error(`服务器处理失败: ${response.status} ${response.statusText}`);
+            throw new Error(`Server processing failed: ${response.status} ${response.statusText}`);
           }
           
           result = await response.json();
           
           if (!result.success) {
-            throw new Error(result.error || '服务器端表现分析失败');
+            throw new Error(result.error || 'Server-side performance analysis failed');
           }
           
-          console.log(`✅ 球员表现分析第 ${attempts} 次尝试成功！`);
+          console.log(`✅ Player performance analysis attempt ${attempts} successful!`);
           break;
           
         } catch (attemptError) {
-          console.error(`❌ 球员表现分析第 ${attempts} 次尝试失败:`, attemptError);
+          console.error(`❌ Player performance analysis attempt ${attempts} failed:`, attemptError);
           
           if (attempts === maxAttempts) {
-            // 提供更具体的错误信息
             if (attemptError instanceof Error) {
-              if (attemptError.message.includes('资源不足') || attemptError.message.includes('546')) {
-                throw new Error('服务器资源不足，无法处理此大小的视频文件。请尝试：1) 压缩视频文件到200MB以下 2) 缩短视频长度 3) 稍后重试');
-              } else if (attemptError.message.includes('超时')) {
-                throw new Error('处理超时，视频文件可能过大或过于复杂。请尝试使用较小的视频文件');
+              if (attemptError.message.includes('resources insufficient') || attemptError.message.includes('546')) {
+                throw new Error('Server resources insufficient, unable to process this size video file. Please try: 1) Compress video file to under 200MB 2) Shorten video length 3) Retry later');
+              } else if (attemptError.message.includes('timeout')) {
+                throw new Error('Processing timeout, video file may be too large or complex. Please try using smaller video files');
               }
             }
             throw attemptError;
           }
           
-          // 增加延迟时间
           await new Promise(resolve => setTimeout(resolve, 10000 * attempts));
         }
       }
       
       if (!result || !result.success) {
-        throw new Error('服务器端球员表现分析失败');
+        throw new Error('Server-side player performance analysis failed');
       }
       
       return result.performanceData;
       
     } catch (error) {
-      console.error('❌ 服务器端球员表现分析失败:', error);
+      console.error('❌ Server-side player performance analysis failed:', error);
       throw error;
     }
   }
@@ -800,16 +768,15 @@ export class FootballAI {
     timestamp: number = 10
   ): Promise<string | null> {
     try {
-      console.log('📸 开始截取球员头像...', { playerId, timestamp });
+      console.log('📸 Starting player avatar capture...', { playerId, timestamp });
       
-      // 创建视频元素来截取帧
       const video = document.createElement('video');
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
 
       return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
-          reject(new Error('头像截取超时'));
+          reject(new Error('Avatar capture timeout'));
         }, 10000);
 
         video.onloadeddata = () => {
@@ -824,13 +791,11 @@ export class FootballAI {
             if (ctx && canvas.width > 0 && canvas.height > 0) {
               ctx.drawImage(video, 0, 0);
               
-              // 创建头像尺寸的canvas
               const avatarCanvas = document.createElement('canvas');
               const avatarCtx = avatarCanvas.getContext('2d');
               avatarCanvas.width = 150;
               avatarCanvas.height = 150;
               
-              // 假设球员在画面中央区域，截取一个正方形区域
               const cropSize = Math.min(canvas.width, canvas.height) * 0.2;
               const cropX = canvas.width * 0.4;
               const cropY = canvas.height * 0.3;
@@ -849,19 +814,19 @@ export class FootballAI {
                 );
                 
                 const avatarDataUrl = avatarCanvas.toDataURL('image/jpeg', 0.8);
-                console.log('✅ 头像截取成功');
+                console.log('✅ Avatar capture successful');
                 clearTimeout(timeout);
                 resolve(avatarDataUrl);
               } else {
                 clearTimeout(timeout);
-                reject(new Error('无法创建头像画布'));
+                reject(new Error('Unable to create avatar canvas'));
               }
             } else {
               clearTimeout(timeout);
-              reject(new Error('视频尺寸无效，无法截取头像'));
+              reject(new Error('Invalid video dimensions, unable to capture avatar'));
             }
           } catch (error) {
-            console.error('❌ 头像截取过程中出错:', error);
+            console.error('❌ Error during avatar capture:', error);
             clearTimeout(timeout);
             reject(error);
           }
@@ -869,15 +834,15 @@ export class FootballAI {
 
         video.onerror = () => {
           clearTimeout(timeout);
-          reject(new Error('视频加载失败，无法截取头像'));
+          reject(new Error('Video loading failed, unable to capture avatar'));
         };
 
         video.src = URL.createObjectURL(videoFile);
       });
 
     } catch (error) {
-      console.error('❌ 头像截取失败:', error);
-      throw new Error('头像截取失败，请重试');
+      console.error('❌ Avatar capture failed:', error);
+      throw new Error('Avatar capture failed, please try again');
     }
   }
 
@@ -892,8 +857,8 @@ export class FootballAI {
   private validateScore(value: any, fieldName: string): number {
     const num = Number(value);
     if (isNaN(num) || num < 0 || num > 100) {
-      console.error(`❌ 验证失败 - ${fieldName}:`, value);
-      throw new Error(`AI 分析结果中 ${fieldName} 字段值无效: ${value}`);
+      console.error(`❌ Validation failed - ${fieldName}:`, value);
+      throw new Error(`AI analysis result ${fieldName} field value invalid: ${value}`);
     }
     return Math.round(num);
   }
@@ -901,15 +866,14 @@ export class FootballAI {
   private validateNumber(value: any, fieldName: string, min: number, max: number): number {
     const num = Number(value);
     if (isNaN(num) || num < min || num > max) {
-      console.error(`❌ 验证失败 - ${fieldName}:`, value, `范围: ${min}-${max}`);
-      throw new Error(`AI 分析结果中 ${fieldName} 字段值无效: ${value} (应在 ${min}-${max} 范围内)`);
+      console.error(`❌ Validation failed - ${fieldName}:`, value, `range: ${min}-${max}`);
+      throw new Error(`AI analysis result ${fieldName} field value invalid: ${value} (should be in ${min}-${max} range)`);
     }
-    return Math.round(num * 10) / 10; // Round to 1 decimal place
+    return Math.round(num * 10) / 10;
   }
 
-  // 恢复：生成带边界框的运动轨迹
+  // Generate realistic movement pattern with boundary boxes
   private generateRealisticMovementPatternWithBounds(startX: number, startY: number, startWidth: number, startHeight: number) {
-    // Generate more realistic movement pattern with 7 points including bounding boxes
     const timestamps = [5, 10, 15, 20, 25, 30, 35];
     const positions = [];
     
@@ -919,10 +883,9 @@ export class FootballAI {
     let currentHeight = startHeight;
     
     for (let i = 0; i < timestamps.length; i++) {
-      // Add some realistic movement variation
-      const moveX = (Math.random() - 0.5) * 15; // Move up to 7.5% in either direction
-      const moveY = (Math.random() - 0.5) * 10; // Move up to 5% in either direction
-      const sizeVariation = (Math.random() - 0.5) * 2; // Slight size variation
+      const moveX = (Math.random() - 0.5) * 15;
+      const moveY = (Math.random() - 0.5) * 10;
+      const sizeVariation = (Math.random() - 0.5) * 2;
       
       currentX = Math.max(5, Math.min(95, currentX + moveX));
       currentY = Math.max(5, Math.min(95, currentY + moveY));
