@@ -1,16 +1,50 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { PerformanceData } from '../App';
 
-const getApiKey = (): string => {
-  const API_KEY = import.meta.env.GEMINI_API;
-  
-  if (!API_KEY) {
-    throw new Error('GEMINI_API_KEY is not configured. Please add VITE_GEMINI_API_KEY to your .env file.');
+const getApiKeyFromBackend = async (): Promise<string> => {
+  try {
+    const response = await fetch('/api/config/gemini-key', {
+      method: 'GET',
+      credentials: 'include',
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch API key');
+    }
+    
+    const data = await response.json();
+    return data.apiKey;
+  } catch (error) {
+    console.error('Failed to get API key from backend:', error);
+    throw error;
   }
-  
-  return API_KEY;
 };
-const genAI = new GoogleGenerativeAI(API_KEY);
+
+// 动态初始化
+let genAI: GoogleGenerativeAI | null = null;
+
+const initializeGenAI = async (): Promise<GoogleGenerativeAI> => {
+  if (genAI) return genAI;
+  
+  try {
+    // 优先尝试从后端获取，失败则使用环境变量
+    let apiKey: string;
+    
+    if (import.meta.env.PROD) {
+      // 生产环境：从后端获取
+      apiKey = await getApiKeyFromBackend();
+    } else {
+      // 开发环境：使用环境变量
+      apiKey = getApiKey();
+    }
+    
+    genAI = new GoogleGenerativeAI(apiKey);
+    return genAI;
+  } catch (error) {
+    console.error('Failed to initialize Gemini AI:', error);
+    throw error;
+  }
+};
 
 export interface PlayerDetection {
   id: number;
