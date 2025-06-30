@@ -1,7 +1,15 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { PerformanceData } from '../App';
 
-import.meta.env.VITE_GEMINI_API_KEY;
+const getApiKey = (): string => {
+  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+  
+  if (!API_KEY) {
+    throw new Error('GEMINI_API_KEY is not configured. Please add VITE_GEMINI_API_KEY to your .env file.');
+  }
+  
+  return API_KEY;
+};
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 export interface PlayerDetection {
