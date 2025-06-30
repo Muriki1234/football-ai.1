@@ -146,7 +146,7 @@ const PlayerSelection: React.FC<PlayerSelectionProps> = ({
     analyzeVideoWithAI();
   };
 
-  // Filter suggestions based on player name input
+  // Fixed: Filter suggestions based on starting characters only
   useEffect(() => {
     if (uploadingForPlayer) {
       setSuggestedPlayers([]);
@@ -155,9 +155,15 @@ const PlayerSelection: React.FC<PlayerSelectionProps> = ({
     }
 
     if (playerName.trim().length > 0) {
-      const filtered = playerDatabase.filter(player =>
-        player.name.toLowerCase().includes(playerName.toLowerCase())
-      );
+      // Only show suggestions if the input starts with the same characters
+      const filtered = playerDatabase.filter(player => {
+        const playerNameLower = player.name.toLowerCase();
+        const inputLower = playerName.toLowerCase().trim();
+        
+        // Check if player name starts with the input
+        return playerNameLower.startsWith(inputLower);
+      });
+      
       setSuggestedPlayers(filtered);
       setShowSuggestions(filtered.length > 0);
     } else {
@@ -772,9 +778,9 @@ const PlayerSelection: React.FC<PlayerSelectionProps> = ({
                         </div>
                       )}
                       
-                      {/* Player Suggestions */}
+                      {/* Fixed Player Suggestions - Better positioning */}
                       {showSuggestions && !uploadingForPlayer && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 max-h-48 overflow-y-auto">
                           {suggestedPlayers.map((player) => (
                             <button
                               key={player.id}
