@@ -1,60 +1,43 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { PerformanceData } from '../App';
+// 使用 Vite 的环境变量语法
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-// 从环境变量获取API key的函数
-const getApiKey = (): string => {
-  const apiKey = import.meta.env.VITE_GEMINI_API || import.meta.env.GEMINI_API;
-  if (!apiKey) {
-    throw new Error('Gemini API key not found. Please set VITE_GEMINI_API or GEMINI_API in your environment variables.');
-  }
-  return apiKey;
-};
+// 添加错误检查
+if (!API_KEY) {
+  console.error('GEMINI API KEY is not defined. Please check your .env file.');
+}
 
-const getApiKeyFromBackend = async (): Promise<string> => {
-  try {
-    const response = await fetch('/api/config/gemini-key', {
-      method: 'GET',
-      credentials: 'include',
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch API key');
-    }
-    
-    const data = await response.json();
-    return data.apiKey;
-  } catch (error) {
-    console.error('Failed to get API key from backend:', error);
-    throw error;
-  }
-};
+const genAI = new GoogleGenerativeAI(API_KEY);
 
-// 动态初始化
-let genAI: GoogleGenerativeAI | null = null;
+export interface PlayerDetection {
+  id: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  confidence: number;
+  jersey?: string;
+  team?: 'home' | 'away';
+  teamColor?: string;
+  timestamp: number;
+  isReferee?: boolean;
+  movementPattern?: {
+    timestamps: number[];
+    positions: { x: number; y: number; width: number; height: number }[];
+  };
+}
 
-const initializeGenAI = async (): Promise<GoogleGenerativeAI> => {
-  if (genAI) return genAI;
-  
-  try {
-    // 优先尝试从后端获取，失败则使用环境变量
-    let apiKey: string;
-    
-    if (import.meta.env.PROD) {
-      // 生产环境：从后端获取
-      apiKey = await getApiKeyFromBackend();
-    } else {
-      // 开发环境：使用环境变量
-      apiKey = getApiKey();
-    }
-    
-    genAI = new GoogleGenerativeAI(apiKey);
-    return genAI;
-  } catch (error) {
-    console.error('Failed to initialize Gemini AI:', error);
-    throw error;
-  }
-};
-
+export interface AnalysisResult {
+  summary: string;
+  keyMoments: string[];
+  playerPerformance: {
+    playerId: number;
+    rating: number;
+    highlights: string[];
+  }[];
+  tacticalInsights: string[];
+}
 export interface PlayerDetection {
   id: number;
   x: number;
@@ -82,19 +65,10 @@ export interface AIAnalysisResult {
 }
 
 export class FootballAI {
-  private model: any = null; // 改为在使用时初始化
+  private model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
   private readonly MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB limit for Files API
   private readonly RECOMMENDED_SIZE = 200 * 1024 * 1024; // 200MB recommended size
   private readonly CHUNK_SIZE = 100 * 1024 * 1024; // 100MB chunks
-
-  // 确保模型已初始化的私有方法
-  private async ensureModelInitialized() {
-    if (!this.model) {
-      const genAIInstance = await initializeGenAI();
-      this.model = genAIInstance.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    }
-    return this.model;
-  }
 
   private extractJsonFromString(text: string): string {
     try {
@@ -247,9 +221,6 @@ export class FootballAI {
     try {
       console.log('🔍 Starting enhanced static frame player analysis...');
       
-      // 确保模型已初始化
-      const model = await this.ensureModelInitialized();
-      
       const prompt = `
         You are an expert football analyst. Analyze this static football image with MAXIMUM PRECISION to identify all players.
 
@@ -315,7 +286,7 @@ export class FootballAI {
           attempts++;
           console.log(`🔄 Static frame analysis attempt ${attempts}...`);
 
-          const result = await model.generateContent([
+          const result = await this.model.generateContent([
             prompt,
             {
               inlineData: {
@@ -711,13 +682,10 @@ export class FootballAI {
       if (!supabaseUrl || !supabaseKey) {
         throw new Error('Supabase environment variables not configured');
       }
-
-      // 获取API key
-      const apiKey = getApiKey();
       
       const formData = new FormData();
       formData.append('video', videoFile);
-      formData.append('apiKey', apiKey);
+      formData.append('apiKey', API_KEY);
       formData.append('playerId', selectedPlayerId.toString());
       formData.append('playerName', playerName);
       if (existingPlayerData) {
@@ -761,4 +729,185 @@ export class FootballAI {
               throw new Error('Server resources insufficient, please try compressing video file or retry later');
             }
             
-            throw new Error(`Server processing failed:
+            throw new Error(`Server processing failed: ${response.status} ${response.statusText}`);
+          }
+          
+          result = await response.json();
+          
+          if (!result.success) {
+            throw new Error(result.error || 'Server-side performance analysis failed');
+          }
+          
+          console.log(`✅ Player performance analysis attempt ${attempts} successful!`);
+          break;
+          
+        } catch (attemptError) {
+          console.error(`❌ Player performance analysis attempt ${attempts} failed:`, attemptError);
+          
+          if (attempts === maxAttempts) {
+            if (attemptError instanceof Error) {
+              if (attemptError.message.includes('resources insufficient') || attemptError.message.includes('546')) {
+                throw new Error('Server resources insufficient, unable to process this size video file. Please try: 1) Compress video file to under 200MB 2) Shorten video length 3) Retry later');
+              } else if (attemptError.message.includes('timeout')) {
+                throw new Error('Processing timeout, video file may be too large or complex. Please try using smaller video files');
+              }
+            }
+            throw attemptError;
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, 10000 * attempts));
+        }
+      }
+      
+      if (!result || !result.success) {
+        throw new Error('Server-side player performance analysis failed');
+      }
+      
+      return result.performanceData;
+      
+    } catch (error) {
+      console.error('❌ Server-side player performance analysis failed:', error);
+      throw error;
+    }
+  }
+
+  async capturePlayerAvatar(
+    videoFile: File,
+    playerId: number,
+    timestamp: number = 10
+  ): Promise<string | null> {
+    try {
+      console.log('📸 Starting player avatar capture...', { playerId, timestamp });
+      
+      const video = document.createElement('video');
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Avatar capture timeout'));
+        }, 10000);
+
+        video.onloadeddata = () => {
+          video.currentTime = timestamp;
+        };
+
+        video.onseeked = () => {
+          try {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            if (ctx && canvas.width > 0 && canvas.height > 0) {
+              ctx.drawImage(video, 0, 0);
+              
+              const avatarCanvas = document.createElement('canvas');
+              const avatarCtx = avatarCanvas.getContext('2d');
+              avatarCanvas.width = 150;
+              avatarCanvas.height = 150;
+              
+              const cropSize = Math.min(canvas.width, canvas.height) * 0.2;
+              const cropX = canvas.width * 0.4;
+              const cropY = canvas.height * 0.3;
+              
+              if (avatarCtx) {
+                avatarCtx.drawImage(
+                  canvas,
+                  cropX,
+                  cropY,
+                  cropSize,
+                  cropSize,
+                  0,
+                  0,
+                  150,
+                  150
+                );
+                
+                const avatarDataUrl = avatarCanvas.toDataURL('image/jpeg', 0.8);
+                console.log('✅ Avatar capture successful');
+                clearTimeout(timeout);
+                resolve(avatarDataUrl);
+              } else {
+                clearTimeout(timeout);
+                reject(new Error('Unable to create avatar canvas'));
+              }
+            } else {
+              clearTimeout(timeout);
+              reject(new Error('Invalid video dimensions, unable to capture avatar'));
+            }
+          } catch (error) {
+            console.error('❌ Error during avatar capture:', error);
+            clearTimeout(timeout);
+            reject(error);
+          }
+        };
+
+        video.onerror = () => {
+          clearTimeout(timeout);
+          reject(new Error('Video loading failed, unable to capture avatar'));
+        };
+
+        video.src = URL.createObjectURL(videoFile);
+      });
+
+    } catch (error) {
+      console.error('❌ Avatar capture failed:', error);
+      throw new Error('Avatar capture failed, please try again');
+    }
+  }
+
+  private formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  private validateScore(value: any, fieldName: string): number {
+    const num = Number(value);
+    if (isNaN(num) || num < 0 || num > 100) {
+      console.error(`❌ Validation failed - ${fieldName}:`, value);
+      throw new Error(`AI analysis result ${fieldName} field value invalid: ${value}`);
+    }
+    return Math.round(num);
+  }
+
+  private validateNumber(value: any, fieldName: string, min: number, max: number): number {
+    const num = Number(value);
+    if (isNaN(num) || num < min || num > max) {
+      console.error(`❌ Validation failed - ${fieldName}:`, value, `range: ${min}-${max}`);
+      throw new Error(`AI analysis result ${fieldName} field value invalid: ${value} (should be in ${min}-${max} range)`);
+    }
+    return Math.round(num * 10) / 10;
+  }
+
+  private generateRealisticMovementPatternWithBounds(startX: number, startY: number, startWidth: number, startHeight: number) {
+    const timestamps = [5, 10, 15, 20, 25, 30, 35];
+    const positions = [];
+    
+    let currentX = startX;
+    let currentY = startY;
+    let currentWidth = startWidth;
+    let currentHeight = startHeight;
+    
+    for (let i = 0; i < timestamps.length; i++) {
+      const moveX = (Math.random() - 0.5) * 15;
+      const moveY = (Math.random() - 0.5) * 10;
+      const sizeVariation = (Math.random() - 0.5) * 2;
+      
+      currentX = Math.max(5, Math.min(95, currentX + moveX));
+      currentY = Math.max(5, Math.min(95, currentY + moveY));
+      currentWidth = Math.max(5, Math.min(20, currentWidth + sizeVariation));
+      currentHeight = Math.max(10, Math.min(30, currentHeight + sizeVariation));
+      
+      positions.push({
+        x: Math.round(currentX * 10) / 10,
+        y: Math.round(currentY * 10) / 10,
+        width: Math.round(currentWidth * 10) / 10,
+        height: Math.round(currentHeight * 10) / 10
+      });
+    }
+    
+    return { timestamps, positions };
+  }
+}
