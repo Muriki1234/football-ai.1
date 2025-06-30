@@ -5,8 +5,77 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Football AI Assistant - Elevate Your Game</title>
+    <style>
+      /* Bolt Badge Styles */
+      .bolt-badge {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1000;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+      }
+
+      .bolt-badge:hover {
+        transform: scale(1.05) rotate(5deg);
+        filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.2));
+      }
+
+      .bolt-badge img {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: block;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      /* Tooltip */
+      .bolt-badge::after {
+        content: "Made with Bolt.new";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%) translateY(10px);
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+        pointer-events: none;
+      }
+
+      .bolt-badge:hover::after {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(-50%) translateY(0);
+      }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        .bolt-badge {
+          top: 15px;
+          right: 15px;
+        }
+        
+        .bolt-badge img {
+          width: 50px;
+          height: 50px;
+        }
+      }
+    </style>
   </head>
   <body>
+    <!-- Bolt Badge -->
+    <a href="https://bolt.new/" class="bolt-badge" target="_blank" rel="noopener">
+      <img src="/black_circle.png" alt="Made with Bolt.new" />
+    </a>
+    
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
