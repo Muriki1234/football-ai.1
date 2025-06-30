@@ -22,7 +22,6 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
 
     try {
       if (isLogin) {
-        // 登录
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -33,19 +32,18 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         }
 
         if (data.user) {
-          setMessage({ type: 'success', text: '登录成功！' });
+          setMessage({ type: 'success', text: 'Login successful!' });
           setTimeout(() => {
             onAuthSuccess();
           }, 1000);
         }
       } else {
-        // 注册
         if (password !== confirmPassword) {
-          throw new Error('密码确认不匹配');
+          throw new Error('Password confirmation does not match');
         }
 
         if (password.length < 6) {
-          throw new Error('密码长度至少需要6位');
+          throw new Error('Password must be at least 6 characters long');
         }
 
         const { data, error } = await supabase.auth.signUp({
@@ -60,9 +58,8 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         if (data.user) {
           setMessage({ 
             type: 'success', 
-            text: '注册成功！请检查您的邮箱进行验证，然后登录。' 
+            text: 'Registration successful! Please check your email for verification, then login.' 
           });
-          // 切换到登录模式
           setTimeout(() => {
             setIsLogin(true);
             setPassword('');
@@ -71,10 +68,10 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
         }
       }
     } catch (error) {
-      console.error('认证错误:', error);
+      console.error('Authentication error:', error);
       setMessage({ 
         type: 'error', 
-        text: error instanceof Error ? error.message : '认证失败，请重试' 
+        text: error instanceof Error ? error.message : 'Authentication failed, please try again' 
       });
     } finally {
       setLoading(false);
@@ -101,19 +98,18 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
             <User className="h-8 w-8 text-white" />
           </div>
           <h2 className="text-3xl font-bold text-gray-900">
-            {isLogin ? '登录您的账户' : '创建新账户'}
+            {isLogin ? 'Sign In to Your Account' : 'Create New Account'}
           </h2>
           <p className="mt-2 text-gray-600">
-            {isLogin ? '继续您的足球分析之旅' : '开始您的 AI 足球分析体验'}
+            {isLogin ? 'Continue your football analysis journey' : 'Start your AI football analysis experience'}
           </p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <form className="space-y-6" onSubmit={handleSubmit}>
-            {/* 邮箱输入 */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                邮箱地址
+                Email Address
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -128,15 +124,14 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                  placeholder="请输入您的邮箱"
+                  placeholder="Enter your email"
                 />
               </div>
             </div>
 
-            {/* 密码输入 */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                密码
+                Password
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -151,7 +146,7 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                  placeholder={isLogin ? '请输入密码' : '请设置密码（至少6位）'}
+                  placeholder={isLogin ? 'Enter password' : 'Set password (at least 6 characters)'}
                 />
                 <button
                   type="button"
@@ -167,11 +162,10 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
               </div>
             </div>
 
-            {/* 确认密码输入（仅注册时显示） */}
             {!isLogin && (
               <div>
                 <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                  确认密码
+                  Confirm Password
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -186,13 +180,12 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
-                    placeholder="请再次输入密码"
+                    placeholder="Enter password again"
                   />
                 </div>
               </div>
             )}
 
-            {/* 消息提示 */}
             {message && (
               <div className={`p-4 rounded-lg flex items-center space-x-2 ${
                 message.type === 'success' 
@@ -208,7 +201,6 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
               </div>
             )}
 
-            {/* 提交按钮 */}
             <button
               type="submit"
               disabled={loading}
@@ -221,48 +213,46 @@ const Auth: React.FC<AuthProps> = ({ onAuthSuccess }) => {
               {loading ? (
                 <div className="flex items-center space-x-2">
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>{isLogin ? '登录中...' : '注册中...'}</span>
+                  <span>{isLogin ? 'Signing In...' : 'Registering...'}</span>
                 </div>
               ) : (
                 <div className="flex items-center space-x-2">
                   {isLogin ? <LogIn className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
-                  <span>{isLogin ? '登录' : '注册'}</span>
+                  <span>{isLogin ? 'Sign In' : 'Register'}</span>
                 </div>
               )}
             </button>
           </form>
 
-          {/* 切换登录/注册 */}
           <div className="mt-6 text-center">
             <button
               type="button"
               onClick={toggleMode}
               className="text-green-600 hover:text-green-700 font-medium transition-colors"
             >
-              {isLogin ? '还没有账户？立即注册' : '已有账户？立即登录'}
+              {isLogin ? "Don't have an account? Register now" : 'Already have an account? Sign in now'}
             </button>
           </div>
         </div>
 
-        {/* 功能说明 */}
         <div className="bg-white rounded-2xl shadow-lg p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">为什么需要注册？</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Why Register?</h3>
           <ul className="space-y-2 text-sm text-gray-600">
             <li className="flex items-start space-x-2">
               <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
-              <span>保存您的球员分析数据和历史记录</span>
+              <span>Save your player analysis data and historical records</span>
             </li>
             <li className="flex items-start space-x-2">
               <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
-              <span>跨设备同步您的球员数据库</span>
+              <span>Sync your player database across devices</span>
             </li>
             <li className="flex items-start space-x-2">
               <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
-              <span>追踪球员长期进步趋势</span>
+              <span>Track long-term player progress trends</span>
             </li>
             <li className="flex items-start space-x-2">
               <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
-              <span>享受个性化的 AI 分析建议</span>
+              <span>Enjoy personalized AI analysis recommendations</span>
             </li>
           </ul>
         </div>
